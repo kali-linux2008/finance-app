@@ -9,6 +9,7 @@ Ontwerpfase. Deze repository bevat het hi-fi ontwerp als klikbaar HTML-prototype
 ```
 design/
   Vermogen App (offline).html         ← open dit: werkt zonder internet, alle schermen
+  Vermogen App v3 Luxe.dc.html        ← nieuwste ontwerp (luxe variant)
   Vermogen App v2 Donker.dc.html      ← bronbestand van het prototype
   Variaties nieuwe schermen.dc.html   ← alternatieven voor Volglijst en Herbalanceren
   android-frame.jsx, support.js       ← nodig om de .dc.html-bestanden te openen
