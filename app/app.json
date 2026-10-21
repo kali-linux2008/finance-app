@@ -32,7 +32,8 @@
           "imageWidth": 160
         }
       ],
-      "expo-system-ui"
+      "expo-system-ui",
+      "expo-secure-store"
     ]
   }
 }

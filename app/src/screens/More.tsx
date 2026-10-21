@@ -9,6 +9,7 @@ import { T } from '../components/T';
 import { Card, IconButton } from '../components/ui';
 import { OPEN_ORDERS } from '../data/sample';
 import { useApp, useColors } from '../state/app';
+import { useLock } from '../state/lock';
 
 const ROWS: [IconName, string, string][] = [
   ['pending_actions', 'Lopende orders', `${OPEN_ORDERS} open`],
@@ -26,6 +27,7 @@ export function More() {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { theme, setTheme, privacy, togglePrivacy, say } = useApp();
+  const { lock, biometricAvailable, biometricEnabled, setBiometricEnabled } = useLock();
   const soon = () => say('Komt in een volgende stap');
 
   return (
@@ -61,10 +63,15 @@ export function More() {
         <Card style={{ marginTop: 12, marginHorizontal: 16, paddingVertical: 4 }}>
           <ToggleRow label="Donker thema" sub="Volgt anders het systeem" on={theme === 'dark'} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
           <ToggleRow label="Privacymodus" sub="Bedragen verbergen" on={privacy} onToggle={togglePrivacy} />
-          <ToggleRow label="Vingerafdruk bij openen" sub="Pincode als terugval" on onToggle={() => say('Beveiliging vereist je pincode')} />
+          <ToggleRow
+            label="Vingerafdruk bij openen"
+            sub={biometricAvailable ? 'Pincode als terugval' : 'Geen vingerafdruk ingesteld op dit toestel'}
+            on={biometricAvailable && biometricEnabled}
+            onToggle={() => (biometricAvailable ? setBiometricEnabled(!biometricEnabled) : say('Stel eerst een vingerafdruk in bij de Android-instellingen'))}
+          />
         </Card>
 
-        <Pressable onPress={soon} style={{ marginTop: 12, marginHorizontal: 16, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: c.line, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+        <Pressable onPress={lock} style={{ marginTop: 12, marginHorizontal: 16, height: 52, borderRadius: 26, borderWidth: 1.5, borderColor: c.line, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
           <Icon name="lock" size={20} />
           <T size={15} w={600}>Vergrendelen</T>
         </Pressable>

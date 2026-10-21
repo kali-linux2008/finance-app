@@ -10,7 +10,10 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toast } from '../components/Toast';
+import { Loading } from '../screens/Loading';
+import { LockScreen } from '../screens/LockScreen';
 import { AppProvider, useApp } from '../state/app';
+import { LockProvider, useLock } from '../state/lock';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -27,7 +30,9 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <Shell />
+        <LockProvider>
+          <Shell />
+        </LockProvider>
       </AppProvider>
     </SafeAreaProvider>
   );
@@ -35,14 +40,21 @@ export default function RootLayout() {
 
 function Shell() {
   const { theme, colors } = useApp();
+  const { phase } = useLock();
+  const locked = phase === 'setup' || phase === 'locked';
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.bg);
   }, [colors.bg]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StatusBar style={theme === 'dark' ? 'light' : 'dark'} />
-      {/* Eigen inschuif-animatie per scherm, daarom geen animatie van de stapel zelf. */}
-      <Stack screenOptions={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: colors.bg } }} />
+      <StatusBar style={locked || theme === 'dark' ? 'light' : 'dark'} />
+      {/* Zolang de app vergrendeld is, worden de schermen met bedragen niet eens getekend. */}
+      {locked ? <LockScreen /> : null}
+      {phase === 'loading' ? <Loading /> : null}
+      {phase === 'open' ? (
+        // Eigen inschuif-animatie per scherm, daarom geen animatie van de stapel zelf.
+        <Stack screenOptions={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: colors.bg } }} />
+      ) : null}
       <Toast />
     </View>
   );
