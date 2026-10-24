@@ -1,7 +1,8 @@
 // Detail van één belegging: koers in goud, scrubbare grafiek, positie, bewaarplekken, dividend, transacties.
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
 import { LineChart, scrubIndex } from '../components/LineChart';

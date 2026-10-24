@@ -1,6 +1,7 @@
 // Overzicht: begroeting, hero, kerncijfers, verdeling, bronnen, doelen en zaken buiten belegd vermogen.
 import { router } from 'expo-router';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Hero } from '../components/Hero';
 import { Icon } from '../components/Icon';
