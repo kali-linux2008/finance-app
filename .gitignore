@@ -22,3 +22,7 @@ bin-release/
 node_modules/
 .env
 *.log
+
+# Firebase-serviceaccount (geheim: alleen uploaden naar Expo, nooit in git)
+*firebase-adminsdk*.json
+service-account*.json

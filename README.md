@@ -3,7 +3,7 @@
 Persoonlijk vermogens- en beleggingsdashboard voor Android (Nederlands, EUR). Bundelt Trading 212, OKX, Trezor Safe 5, ING en handmatige bezittingen (goud, pensioen, woning) in één overzicht, met handelen via Trading 212 en OKX.
 
 ## Status
-Stap 1–5 gebouwd, stap 6 deels (periodiek inleggen):
+Stap 1–5 gebouwd, stap 6 deels (periodiek inleggen, pushmeldingen):
 - de Expo-app in `app/`: thema, Overzicht, Portefeuille, Detail, het vergrendelscherm met pincode en vingerafdruk, het handelsvenster en Lopende orders;
 - de server in `server/` (Python/FastAPI): haalt je echte saldi op bij Trading 212, OKX en je Trezor, plus handmatige bezittingen zoals Rabobank, goud, pensioen en woning (alleen-lezen);
 - handelen via Trading 212 en OKX: standaard met oefengeld (demo); echt geld alleen als je het op de server aanzet. Met aparte handelssleutels, een dagmaximum en een orderlogboek.
@@ -27,6 +27,7 @@ design/
 docs/
   STARTEN.md                          ← de app op je telefoon openen (Node.js, Git, Expo Go)
   SERVER.md                           ← de server installeren en Trading 212, OKX, Trezor koppelen
+  MELDINGEN.md                        ← de eigen Meridian-app bouwen met pushmeldingen
   ADVIES-STACK.md                     ← waarmee bouwen en in welke volgorde
   tokens.json                         ← alle ontwerpwaarden
   HANDOFF.md                          ← specificatie voor de ontwikkelaar: kleuren, typografie, schermen, gedrag
@@ -37,4 +38,4 @@ docs/
 - De `.dc.html`-bestanden werken als je ze via een lokale webserver opent (bijv. `npx serve design`), omdat ze `support.js` en `android-frame.jsx` laden.
 
 ## Volgende stap
-Rest van stap 6 uit `docs/ADVIES-STACK.md`: koersalerts, pushmeldingen en herbalanceren.
+Rest van stap 6 uit `docs/ADVIES-STACK.md`: koersalerts en herbalanceren.

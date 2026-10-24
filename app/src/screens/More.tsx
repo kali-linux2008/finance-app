@@ -1,6 +1,7 @@
 // Meer: profiel, links naar de overige schermen en de schakelaars (thema, privacy, vingerafdruk).
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
+import * as Device from 'expo-device';
 import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '../components/Icon';
@@ -8,6 +9,9 @@ import { ScreenIn } from '../components/motion';
 import { T } from '../components/T';
 import { Card, IconButton } from '../components/ui';
 import { OPEN_ORDERS } from '../data/sample';
+import { registerPush, unregisterPush } from '../lib/api';
+import { getPushToken } from '../lib/push';
+import { deleteItem, getItem, KEYS, setItem } from '../lib/storage';
 import { useApp, useColors } from '../state/app';
 import { useData } from '../state/data';
 import { useLock } from '../state/lock';
@@ -31,6 +35,36 @@ export function More() {
   const { lock, biometricAvailable, biometricEnabled, setBiometricEnabled } = useLock();
   const { server, error } = useData();
   const soon = () => say('Komt in een volgende stap');
+  const [push, setPush] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    getItem(KEYS.push).then(setPush).catch(() => {});
+  }, []);
+
+  const togglePush = async () => {
+    if (!server) return say('Koppel eerst je server (Meer → Server)');
+    if (pushBusy) return;
+    setPushBusy(true);
+    try {
+      if (push) {
+        await unregisterPush(server, push).catch(() => {});
+        await deleteItem(KEYS.push);
+        setPush(null);
+        say('Meldingen uit');
+      } else {
+        const token = await getPushToken();
+        await registerPush(server, token, Device.modelName ?? 'telefoon');
+        await setItem(KEYS.push, token);
+        setPush(token);
+        say('Meldingen aan');
+      }
+    } catch (e) {
+      say((e as Error).message);
+    } finally {
+      setPushBusy(false);
+    }
+  };
 
   return (
     <ScreenIn style={{ backgroundColor: c.bg, paddingTop: insets.top }}>
@@ -75,6 +109,7 @@ export function More() {
         <Card style={{ marginTop: 12, marginHorizontal: 16, paddingVertical: 4 }}>
           <ToggleRow label="Donker thema" sub="Volgt anders het systeem" on={theme === 'dark'} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
           <ToggleRow label="Privacymodus" sub="Bedragen verbergen" on={privacy} onToggle={togglePrivacy} />
+          <ToggleRow label="Meldingen" sub="Bijv. of je periodieke inleg gelukt is" on={!!push} onToggle={togglePush} />
           <ToggleRow
             label="Vingerafdruk bij openen"
             sub={biometricAvailable ? 'Pincode als terugval' : 'Geen vingerafdruk ingesteld op dit toestel'}

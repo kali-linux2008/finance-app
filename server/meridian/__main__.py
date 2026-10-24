@@ -35,6 +35,7 @@ HELP = """Meridian-server beheren
   python -m meridian handel echtgeld maximum 25   dagmaximum voor echt geld
   python -m meridian handel periodiek      periodiek inleggen bekijken (aan / uit / maximum 400)
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
+  python -m meridian melding               telefoons met meldingen tonen (melding test = testmelding)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -328,6 +329,30 @@ def cmd_plan(s: Store, args: list[str]) -> None:
         print(f"  {'✓' if run['ok'] else '✗'} {when}  {run['message']}")
 
 
+def cmd_notify(args: list[str]) -> None:
+    """Gekoppelde telefoons voor meldingen tonen, of een testmelding sturen."""
+    from . import notify
+
+    s = Store()
+    targets = notify.tokens(s)
+    if args[:1] == ["test"]:
+        if not targets:
+            print("Nog geen telefoon met meldingen. Zet ze aan in de Meridian-app: Meer → Meldingen.")
+            return
+
+        async def run() -> int:
+            async with httpx.AsyncClient(timeout=20) as c:
+                return await notify.send(s, c, "Meridian", "Testmelding: meldingen werken.")
+        ok = asyncio.run(run())
+        print(f"Testmelding verstuurd naar {ok} van {len(targets)} telefoon(s).")
+        return
+    if not targets:
+        print("Nog geen telefoon met meldingen. Zet ze aan in de Meridian-app: Meer → Meldingen.")
+    for t in targets:
+        print(f"  {t['device']:<24} sinds {datetime.fromtimestamp(t['at']).strftime('%d-%m-%Y')}")
+    print("Testmelding sturen: python -m meridian melding test")
+
+
 def cmd_manual() -> None:
     s = Store()
     data = s.get_setting("manual") or {}
@@ -420,6 +445,8 @@ def main(argv: list[str]) -> None:
         cmd_manual()
     elif cmd == "status":
         cmd_status()
+    elif cmd == "melding":
+        cmd_notify(args)
     elif cmd == "handel":
         cmd_trade(args)
     elif cmd == "apparaten":

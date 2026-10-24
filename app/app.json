@@ -15,7 +15,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "nl.jarno.meridian"
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -33,7 +34,21 @@
         }
       ],
       "expo-system-ui",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#D9BC82"
+        }
+      ]
     ]
   }
 }
