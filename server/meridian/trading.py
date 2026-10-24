@@ -146,6 +146,13 @@ async def _t212_account(client: httpx.AsyncClient, secret: dict, symbol: str) ->
     return qty, cash
 
 
+async def _t212_min_qty(client: httpx.AsyncClient, secret: dict, symbol: str) -> float:
+    """Kleinste aantal dat Trading 212 voor dit instrument accepteert (0 als onbekend)."""
+    base, headers = _t212(secret)
+    meta = await trading212._instruments(client, base, headers)
+    return float((meta.get(symbol) or {}).get("minTradeQuantity") or 0)
+
+
 async def _t212_place(client: httpx.AsyncClient, secret: dict, symbol: str, qty: float, limit: float | None) -> dict:
     """Plaatst een order; probeert minder decimalen als Trading 212 de precisie weigert (dan is er niets geplaatst)."""
     base, headers = _t212(secret)
@@ -273,7 +280,9 @@ async def quote(store: Store, client: httpx.AsyncClient, pos_id: str) -> dict:
     try:
         if prod.broker == "t212":
             qty, cash = await _t212_account(client, secret, prod.symbol)
-            out.update(sellQty=qty, sellMax=round(qty * prod.eur_per_unit, 2), cash=round(cash, 2))
+            min_qty = await _t212_min_qty(client, secret, prod.symbol)
+            out.update(sellQty=qty, sellMax=round(qty * prod.eur_per_unit, 2), cash=round(cash, 2), minQty=min_qty,
+                       minAmount=max(MIN_EUR, math.ceil(min_qty * prod.eur_per_unit * 1.01 * 100) / 100))
         else:
             pair = await _okx_pair(client, secret, prod.symbol)
             rate = await _quote_eur(client, pair["quote"])
@@ -345,6 +354,10 @@ async def _place_t212(client: httpx.AsyncClient, secret: dict, prod: Product, re
             raise TradeError(f"Je kunt hooguit {_eur(have)} verkopen.")
         qty = held if req.amount >= have * 0.99 else req.amount / per_unit  # (bijna) alles: alles verkopen
         qty = -qty
+    min_qty = await _t212_min_qty(client, secret, prod.symbol)
+    if abs(qty) < min_qty and not (req.side == "verkopen" and abs(qty) == held):
+        raise TradeError(f"Te klein voor {prod.tk} bij Trading 212: minimaal {min_qty:g} stuks, "
+                         f"ongeveer {_eur(min_qty * per_unit * 1.01)}.")
     limit = prod.price * factor if req.type == "limiet" else None
     res = await _t212_place(client, secret, prod.symbol, qty, limit)
     return {**res, "limit": limit}

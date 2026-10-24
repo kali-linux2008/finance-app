@@ -85,7 +85,7 @@ export function estimate(q: Quote, side: Side, amount: number, type: OrderType, 
   let error = '';
   if (type === 'limiet' && q.limitAllowed === false) error = 'Met echt geld kan Trading 212 alleen marktorders';
   else if (amount <= 0) error = 'Voer een bedrag in';
-  else if (amount < q.minAmount) error = `Minimaal € ${q.minAmount}`.replace('.', ',');
+  else if (amount < q.minAmount) error = `Minimaal ${Number.isInteger(q.minAmount) ? `€ ${q.minAmount}` : euro(q.minAmount)}` + (q.minAmount > 1 ? ` voor ${q.tk}` : '');
   else if (!isBuy && amount > q.sellMax + 0.005) {
     error = q.sellMax <= 0 ? `Je hebt geen ${q.tk} op ${q.brokerName}` : `Max ${euro(q.sellMax)}` + (q.broker === 'okx' ? ' op OKX · Trezor is alleen-lezen' : '');
   } else if (isBuy && q.cash != null && amount + fee > q.cash + 0.005) error = `Vrij saldo ${euro(q.cash)}`;

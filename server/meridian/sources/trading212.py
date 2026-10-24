@@ -65,9 +65,22 @@ def _reason(r: httpx.Response) -> str:
     except ValueError:
         return ""
     if isinstance(body, dict):
-        text = body.get("clarification") or body.get("message") or body.get("code") or body.get("type")
+        kind = str(body.get("type") or body.get("code") or "")
+        for key, nl in KNOWN_ERRORS.items():
+            if kind.endswith(key):
+                return f": {nl}"
+        text = body.get("clarification") or body.get("detail") or body.get("title") or body.get("message") or kind
         return f": {text}" if text else ""
     return ""
+
+
+# Veelvoorkomende weigeringen in gewone taal (Trading 212 geeft ze als "/api-errors/<naam>").
+KNOWN_ERRORS = {
+    "min-quantity-exceeded": "het aantal is kleiner dan het minimum dat Trading 212 voor dit aandeel toestaat. Kies een groter bedrag.",
+    "max-quantity-exceeded": "het aantal is groter dan Trading 212 in één order toestaat.",
+    "insufficient-funds": "niet genoeg vrij saldo.",
+    "InsufficientFreeForStocksBuy": "niet genoeg vrij saldo.",
+}
 
 
 async def _get(client: httpx.AsyncClient, base: str, path: str, headers: dict) -> object:
