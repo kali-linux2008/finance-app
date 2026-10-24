@@ -12,6 +12,11 @@ from . import auth, config
 from .sources import okx, trading212, trezor
 from .store import Store
 
+try:
+    import readline  # noqa: F401  (pijltjes en geschiedenis bij het typen van antwoorden)
+except ImportError:  # niet op elk systeem aanwezig, bijv. Windows
+    pass
+
 HELP = """Meridian-server beheren
 
   python -m meridian init                  eenmalig: maakt de geheime hoofdsleutel aan (data/master.key)
@@ -29,9 +34,15 @@ HELP = """Meridian-server beheren
 SOURCE_IDS = {"trading212": "t212", "t212": "t212", "okx": "okx", "trezor": "trezor"}
 
 
+def clean(text: str) -> str:
+    """Haalt stuurcodes weg (bijv. ^[[D van pijltjestoetsen) en overbodige spaties."""
+    text = re.sub(r"\x1b\[[0-9;]*[A-Za-z]|\x1b.?", "", text)
+    return "".join(ch for ch in text if ch.isprintable()).strip()
+
+
 def ask(prompt: str, default: str | None = None, secret: bool = False) -> str:
     hint = f" [{default}]" if default not in (None, "") else ""
-    value = (getpass.getpass if secret else input)(f"{prompt}{hint}: ").strip()
+    value = clean((getpass.getpass if secret else input)(f"{prompt}{hint}: "))
     return value or (default or "")
 
 
@@ -199,7 +210,7 @@ def main(argv: list[str]) -> None:
     elif cmd == "koppelcode":
         code = auth.new_pair_code(Store())
         print(f"Koppelcode: {code[:3]} {code[3:]}  (10 minuten geldig)")
-        print("Vul deze in de app in: Meer → Server koppelen.")
+        print("Vul deze in de app in: tik rechtsboven op JV → Server.")
     elif cmd == "bron":
         cmd_source(args)
     elif cmd == "handmatig":
