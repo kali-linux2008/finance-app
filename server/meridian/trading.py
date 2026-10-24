@@ -1,8 +1,9 @@
-"""Handelen via Trading 212 (aandelen/ETF's) en OKX (crypto). In deze versie alleen met oefengeld.
+"""Handelen via Trading 212 (aandelen/ETF's) en OKX (crypto). Standaard alleen met oefengeld.
 
 Veiligheid in het kort:
 - Handelssleutels staan los van de leessleutels (bronnen `t212.handel` en `okx.handel`).
-- Echt geld kan nog niet: LIVE_ALLOWED staat uit en de server weigert sleutels die niet demo zijn.
+- Echt geld staat uit tot je het op de server zelf aanzet (`handel echtgeld aan`). Daarvoor geldt
+  een eigen, laag dagmaximum (standaard € 25), los van het oefengeld.
 - Elke order gaat langs dezelfde controles: minimaal € 1, een dagmaximum, verkopen niet meer
   dan er staat en kopen niet meer dan het vrije saldo.
 - Elke poging komt in het orderlogboek, ook als hij mislukt. Een order met dezelfde
@@ -21,9 +22,9 @@ from . import portfolio, prices
 from .sources import okx, trading212
 from .store import Store
 
-LIVE_ALLOWED = False  # echt geld: pas in een latere stap, bewust aan te zetten
 MIN_EUR = 1.0
-DEFAULT_DAY_MAX = 250.0
+DEFAULT_DAY_MAX = 250.0  # oefengeld
+DEFAULT_LIVE_DAY_MAX = 25.0  # echt geld
 MAX_LIMIT_PCT = 20.0
 
 NAMES = {"t212": "Trading 212", "okx": "OKX"}
@@ -79,21 +80,32 @@ def trade_secret(store: Store, broker: str) -> dict:
     if not secret:
         raise TradeError(f"Nog geen handelssleutel voor {NAMES[broker]}. Voeg die op de server toe met: "
                          f"python -m meridian bron {CLI[broker]}", 409)
-    if not secret.get("demo") and not LIVE_ALLOWED:
-        raise TradeError("Handelen met echt geld staat uit. In deze versie kan alleen het oefenaccount.", 403)
+    if not secret.get("demo") and not live_allowed(store):
+        raise TradeError("Handelen met echt geld staat uit. Aanzetten op de server: python -m meridian handel echtgeld aan", 403)
     return secret
+
+
+def live_allowed(store: Store) -> bool:
+    return bool(store.get_setting("trade.live", False))
+
+
+def is_demo(store: Store, broker: str) -> bool:
+    secret = store.get_secret(SECRET_IDS[broker])
+    return not secret or bool(secret.get("demo"))
 
 
 def connected(store: Store) -> dict[str, bool]:
     return {b: bool(store.get_secret(sid)) for b, sid in SECRET_IDS.items()}
 
 
-def day_max(store: Store) -> float:
-    return float(store.get_setting("trade.daymax", DEFAULT_DAY_MAX))
+def day_max(store: Store, demo: bool = True) -> float:
+    if demo:
+        return float(store.get_setting("trade.daymax", DEFAULT_DAY_MAX))
+    return float(store.get_setting("trade.daymax.live", DEFAULT_LIVE_DAY_MAX))
 
 
-def used_today(store: Store) -> float:
-    return store.traded_since(portfolio.start_of_day(time.time()))
+def used_today(store: Store, demo: bool = True) -> float:
+    return store.traded_since(portfolio.start_of_day(time.time()), demo)
 
 
 def floor_to(x: float, step: float) -> float:
@@ -246,13 +258,18 @@ async def quote(store: Store, client: httpx.AsyncClient, pos_id: str) -> dict:
         "fee": FEE[prod.broker], "fx": FX_FEE if prod.broker == "t212" and prod.cur != "EUR" else 0.0,
         "exec": "Direct · 24/7" if prod.broker == "okx" else "Tijdens openingstijden van de beurs",
         "dayMax": day_max(store), "usedToday": round(used_today(store), 2), "minAmount": MIN_EUR,
+        "limitAllowed": True,
         "connected": False, "demo": True, "sellMax": 0.0, "sellQty": 0.0, "cash": None, "error": None,
     }
     secret = store.get_secret(SECRET_IDS[prod.broker])
     if not secret:
         out["error"] = f"Nog geen handelssleutel voor {NAMES[prod.broker]} op de server."
         return out
-    out["connected"], out["demo"] = True, bool(secret.get("demo"))
+    demo = bool(secret.get("demo"))
+    out.update(connected=True, demo=demo, dayMax=day_max(store, demo), usedToday=round(used_today(store, demo), 2),
+               limitAllowed=demo or prod.broker != "t212")
+    if not demo and not live_allowed(store):
+        out["error"] = "Handelen met echt geld staat uit op de server."
     try:
         if prod.broker == "t212":
             qty, cash = await _t212_account(client, secret, prod.symbol)
@@ -288,7 +305,7 @@ async def place(store: Store, client: httpx.AsyncClient, req: OrderRequest) -> d
         log = {"request_id": req.request_id or None, "broker": prod.broker, "demo": int(bool(secret.get("demo"))),
                "action": req.side, "symbol": prod.symbol, "kind": req.type, "amount": round(req.amount, 2)}
         try:
-            _validate(store, req)
+            _validate(store, req, bool(secret.get("demo")), prod.broker)
             placed = await (_place_t212 if prod.broker == "t212" else _place_okx)(client, secret, prod, req)
         except (TradeError, trading212.T212Error, okx.OkxError, prices.PriceError, httpx.HTTPError) as e:
             row = store.log_order(**log, ok=0, message=_describe(e))
@@ -298,17 +315,20 @@ async def place(store: Store, client: httpx.AsyncClient, req: OrderRequest) -> d
         return _result(row)
 
 
-def _validate(store: Store, req: OrderRequest) -> None:
+def _validate(store: Store, req: OrderRequest, demo: bool, broker: str) -> None:
     if req.side not in ("kopen", "verkopen") or req.type not in ("markt", "limiet"):
         raise TradeError("Onbekend soort order.")
     if not math.isfinite(req.amount) or req.amount < MIN_EUR:
         raise TradeError("Minimaal € 1.")
     if req.type == "limiet" and not (-MAX_LIMIT_PCT <= req.limit_pct <= MAX_LIMIT_PCT):
         raise TradeError(f"Een limiet mag hooguit {MAX_LIMIT_PCT:g}% van de koers afwijken.")
-    left = day_max(store) - used_today(store)
+    if req.type == "limiet" and broker == "t212" and not demo:
+        raise TradeError("Trading 212 staat met echt geld via de API alleen marktorders toe.")
+    left = day_max(store, demo) - used_today(store, demo)
     if req.amount > left + 0.005:
+        cmd = "handel maximum" if demo else "handel echtgeld maximum"
         raise TradeError(f"Dagmaximum bereikt: je kunt vandaag nog voor {_eur(max(left, 0))} handelen. "
-                         "Aanpassen op de server: python -m meridian handel maximum <bedrag>")
+                         f"Aanpassen op de server: python -m meridian {cmd} <bedrag>")
 
 
 async def _place_t212(client: httpx.AsyncClient, secret: dict, prod: Product, req: OrderRequest) -> dict:

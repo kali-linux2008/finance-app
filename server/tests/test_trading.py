@@ -207,3 +207,25 @@ def test_api_trade_endpoints(store, monkeypatch):
         r = c.post("/api/handel/order", headers=h, json={"posId": "t212-VWCEd_EQ", "side": "kopen", "amount": 0.2, "requestId": "y"})
         assert r.status_code == 400 and "Minimaal" in r.json()["detail"]
         assert c.post("/api/handel/order", headers=h, json={"posId": "x", "side": "stelen", "amount": 5, "requestId": "z"}).status_code == 422
+
+
+@respx.mock
+async def test_real_money_only_when_switched_on_with_its_own_low_day_max(store):
+    store.set_secret("t212.handel", {"key": "K", "secret": "S", "demo": False})
+    live = trading212.LIVE
+    respx.get(f"{live}/equity/positions").respond(json=[{"instrument": {"ticker": "VWCEd_EQ"}, "quantity": 10}])
+    respx.get(f"{live}/equity/account/summary").respond(json={"cash": {"availableToTrade": 500}})
+    order = respx.post(f"{live}/equity/orders/market").respond(json={"id": 1})
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(trading.TradeError, match="echtgeld aan"):
+            await trading.place(store, c, req(amount=10, request_id="a"))
+        store.set_setting("trade.live", True)
+        await trading.place(store, c, req(amount=20, request_id="b"))
+        with pytest.raises(trading.TradeError, match="nog voor € 5,00.*echtgeld maximum"):
+            await trading.place(store, c, req(amount=10, request_id="c"))
+        with pytest.raises(trading.TradeError, match="alleen marktorders"):
+            await trading.place(store, c, req(amount=2, type="limiet", request_id="d"))
+        q = await trading.quote(store, c, "t212-VWCEd_EQ")
+    assert order.call_count == 1
+    assert trading.used_today(store, demo=False) == 20 and trading.used_today(store) == 0  # apart geteld
+    assert q["demo"] is False and q["dayMax"] == 25 and q["usedToday"] == 20 and q["limitAllowed"] is False

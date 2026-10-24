@@ -115,7 +115,8 @@ export function Orders() {
               ? b.id === 't212' ? [AMBER, 'Markt gesloten', 'Opent ma 19 okt 09:00'] : [c.pos, 'Online', '24/7 · API verbonden']
               : !b.connected ? [c.faint, 'Niet gekoppeld', 'Geen handelssleutel']
               : b.error ? [c.neg, 'Fout', b.error]
-              : [c.pos, b.demo ? 'Oefenaccount' : 'Verbonden', b.id === 'okx' ? '24/7 · demo' : 'Practice · demo'];
+              : b.demo ? [c.pos, 'Oefenaccount', b.id === 'okx' ? '24/7 · demo' : 'Practice · demo']
+              : [c.neg, 'Echt geld', b.id === 'okx' ? '24/7 · echt account' : 'Echt account'];
             return (
               <View key={b.id} style={{ flex: 1, backgroundColor: c.surface, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 14 }}>
                 <T size={12} color={c.muted}>{b.name}</T>
@@ -218,7 +219,7 @@ export function Orders() {
 
         <T size={12} lh={1.5} color={c.faint} style={{ paddingTop: 16, paddingHorizontal: 24, textAlign: 'center' }}>
           {live
-            ? 'Je ziet hier de orders van je oefenaccounts. Wijzig je bij Trading 212 een limiet, dan plaatst de server de order opnieuw.'
+            ? 'Je ziet hier de orders van je handelsaccounts. Wijzig je bij Trading 212 een limiet, dan plaatst de server de order opnieuw.'
             : 'Limietorders bij Trading 212 vervallen na 30 dagen. OKX-orders blijven staan tot je annuleert.'}
         </T>
       </ScrollView>

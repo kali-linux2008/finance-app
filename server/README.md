@@ -15,7 +15,7 @@ Installeren en gebruiken: zie **[docs/SERVER.md](../docs/SERVER.md)**.
 - Sleutels voer je in op de server zelf (`python -m meridian bron …`), dus nooit via de app of het netwerk.
 - De app koppelt met een eenmalige code van 6 cijfers (10 min geldig, max. 5 pogingen) en krijgt een lange geheime sleutel. Op de server staat daarvan alleen een hash.
 - Privésleutels (`xprv`) worden geweigerd.
-- Handelen gaat met **aparte** handelssleutels (`bron trading212-handel`, `bron okx-handel`) en kan in deze versie alleen op oefenaccounts (`LIVE_ALLOWED = False` in `trading.py`). Elke order: minimaal € 1, dagmaximum, niet meer verkopen dan er staat, en een regel in het orderlogboek.
+- Handelen gaat met **aparte** handelssleutels (`bron trading212-handel`, `bron okx-handel`) standaard alleen op oefenaccounts. Echt geld zet je bewust aan op de server (`handel echtgeld aan`), met een eigen dagmaximum (standaard € 25). Elke order: minimaal € 1, dagmaximum, niet meer verkopen dan er staat, en een regel in het orderlogboek.
 
 ## Opbouw
 ```

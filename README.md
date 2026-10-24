@@ -6,7 +6,7 @@ Persoonlijk vermogens- en beleggingsdashboard voor Android (Nederlands, EUR). Bu
 Stap 1–5 gebouwd:
 - de Expo-app in `app/`: thema, Overzicht, Portefeuille, Detail, het vergrendelscherm met pincode en vingerafdruk, het handelsvenster en Lopende orders;
 - de server in `server/` (Python/FastAPI): haalt je echte saldi op bij Trading 212, OKX en je Trezor, plus handmatige bezittingen zoals Rabobank, goud, pensioen en woning (alleen-lezen);
-- handelen via Trading 212 en OKX, **alleen met oefengeld** (demo), met aparte handelssleutels, een dagmaximum en een orderlogboek.
+- handelen via Trading 212 en OKX: standaard met oefengeld (demo); echt geld alleen als je het op de server aanzet. Met aparte handelssleutels, een dagmaximum en een orderlogboek.
 
 Zonder gekoppelde server toont de app voorbeelddata.
 
