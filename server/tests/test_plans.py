@@ -70,6 +70,7 @@ async def test_run_buys_every_line_once_per_month(store):
     store.set_setting("plan", PLAN)
     account(500)
     order = respx.post(f"{T212}/equity/orders/market").respond(json={"id": 1})
+    respx.post(config.NTFY_URL).respond(200)
     async with httpx.AsyncClient() as c:
         rep = await plans.run(store, c, at(2026, 10, 26), sleep=no_sleep)
         store.set_setting("plan.tried", None)
@@ -84,12 +85,9 @@ async def test_run_buys_every_line_once_per_month(store):
 
 @respx.mock
 async def test_run_buys_nothing_when_cash_is_short(store):
-    from meridian import notify
-
     store.set_setting("plan", PLAN)
     store.set_setting("plan.enabled", True)
-    notify.add_token(store, "ExponentPushToken[abc]", "Pixel")
-    push = respx.post(notify.PUSH_URL).respond(json={"data": [{"status": "ok"}]})
+    push = respx.post(config.NTFY_URL).respond(200)
     account(100)
     order = respx.post(f"{T212}/equity/orders/market").respond(json={"id": 1})
     async with httpx.AsyncClient() as c:
@@ -99,8 +97,8 @@ async def test_run_buys_nothing_when_cash_is_short(store):
     assert not plans.is_due(store, at(2026, 10, 26, 16, 30))  # vandaag niet nog eens
     assert plans.is_due(store, at(2026, 10, 27))  # morgen opnieuw
     assert store.get_setting("plan.runs")[0]["message"] == rep["message"]
-    sent = json.loads(push.calls[0].request.content)[0]
-    assert sent["title"] == "Inleg niet (helemaal) gelukt" and "€ 100,00 vrij" in sent["body"]
+    sent = json.loads(push.calls[0].request.content)
+    assert sent["title"] == "Inleg niet (helemaal) gelukt" and "€ 100,00 vrij" in sent["message"]
 
 
 def test_validate_month_max_and_lines(store):

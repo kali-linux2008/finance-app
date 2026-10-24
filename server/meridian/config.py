@@ -27,6 +27,8 @@ DB_PATH = DATA_DIR / "meridian.db"
 # zet dan hier je eigen adres neer: dan ziet niemand anders welke adressen van jou zijn.
 ESPLORA_URL = os.environ.get("MERIDIAN_ESPLORA_URL", "https://mempool.space/api")
 OKX_URL = os.environ.get("MERIDIAN_OKX_URL", "https://www.okx.com")
+# Je eigen meldingsdienst (ntfy), draait naast Meridian in docker compose.
+NTFY_URL = os.environ.get("MERIDIAN_NTFY_URL", "http://ntfy")
 
 TZ = ZoneInfo("Europe/Amsterdam")
 

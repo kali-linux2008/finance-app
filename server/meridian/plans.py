@@ -157,7 +157,7 @@ async def _finish(store: Store, client: httpx.AsyncClient, report: dict) -> dict
     _save_report(store, report)
     title = "Inleg gelukt" if report["ok"] else "Inleg niet (helemaal) gelukt"
     body = f"{trading._eur(report['total'])} belegd." if report["ok"] else report["message"]
-    await notify.send(store, client, title, body, {"screen": "periodiek"})
+    await notify.send(store, client, title, body, ["moneybag"] if report["ok"] else ["warning"])
     return report
 
 
