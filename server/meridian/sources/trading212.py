@@ -41,19 +41,37 @@ def short_ticker(t212_ticker: str) -> str:
     return re.sub(r"[a-z]+$", "", base) or base
 
 
-async def _get(client: httpx.AsyncClient, base: str, path: str, headers: dict) -> object:
-    r = await client.get(base + path, headers=headers)
+async def request(client: httpx.AsyncClient, base: str, method: str, path: str, headers: dict,
+                  body: dict | None = None) -> object:
+    r = await client.request(method, base + path, headers=headers, json=body)
     if r.status_code == 401:
         raise T212Error("Trading 212 weigert de sleutel (401). Klopt de sleutel en het geheim?")
     if r.status_code == 403:
-        raise T212Error("De sleutel mist leesrechten voor dit onderdeel (403).")
+        need = "leesrechten" if method == "GET" else "het recht Orders"
+        raise T212Error(f"De sleutel mist {need} voor dit onderdeel (403).")
     if r.status_code == 404:
         raise T212NotFound(f"Onbekend onderdeel bij Trading 212: {path}")
     if r.status_code == 429:
         raise T212Error("Te veel verzoeken aan Trading 212 (429). Even geduld.")
     if r.status_code >= 400:
-        raise T212Error(f"Trading 212 gaf fout {r.status_code}")
-    return r.json()
+        raise T212Error(f"Trading 212 gaf fout {r.status_code}{_reason(r)}")
+    return r.json() if r.content else None
+
+
+def _reason(r: httpx.Response) -> str:
+    """Trading 212 legt een geweigerde order uit in de body, bijv. {"code": "InsufficientFreeForStocksBuy"}."""
+    try:
+        body = r.json()
+    except ValueError:
+        return ""
+    if isinstance(body, dict):
+        text = body.get("clarification") or body.get("message") or body.get("code") or body.get("type")
+        return f": {text}" if text else ""
+    return ""
+
+
+async def _get(client: httpx.AsyncClient, base: str, path: str, headers: dict) -> object:
+    return await request(client, base, "GET", path, headers)
 
 
 async def _instruments(client: httpx.AsyncClient, base: str, headers: dict) -> dict[str, dict]:

@@ -15,11 +15,13 @@ Installeren en gebruiken: zie **[docs/SERVER.md](../docs/SERVER.md)**.
 - Sleutels voer je in op de server zelf (`python -m meridian bron …`), dus nooit via de app of het netwerk.
 - De app koppelt met een eenmalige code van 6 cijfers (10 min geldig, max. 5 pogingen) en krijgt een lange geheime sleutel. Op de server staat daarvan alleen een hash.
 - Privésleutels (`xprv`) worden geweigerd.
+- Handelen gaat met **aparte** handelssleutels (`bron trading212-handel`, `bron okx-handel`) en kan in deze versie alleen op oefenaccounts (`LIVE_ALLOWED = False` in `trading.py`). Elke order: minimaal € 1, dagmaximum, niet meer verkopen dan er staat, en een regel in het orderlogboek.
 
 ## Opbouw
 ```
 meridian/
-  api.py          HTTP-API voor de app (/api/health, /api/koppel, /api/portfolio, /api/history, /api/candles)
+  api.py          HTTP-API voor de app (/api/health, /api/koppel, /api/portfolio, /api/history, /api/candles, /api/handel/…)
+  trading.py      orders naar Trading 212 en OKX (alleen demo), controles en orderlogboek
   portfolio.py    bronnen ophalen, samenvoegen (BTC op Trezor + OKX = één positie), verloop bijhouden
   sources/        trading212.py · okx.py · trezor.py · manual.py
   prices.py       koersen in euro via de openbare OKX-marktdata

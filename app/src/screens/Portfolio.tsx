@@ -27,10 +27,12 @@ export function Portfolio() {
   const { live, positions, total, dayChange, outside, loading, refresh } = useData();
   const groups = view.group === 'cat' ? groupByCategory(positions, view.filter) : groupBySource(positions, view.filter);
   const devs = rebalanceDeviations(positions, total);
-  const links: { icon: IconName; label: string; sub: string; dot: boolean }[] = [
-    { icon: 'pending_actions', label: 'Orders', sub: `${OPEN_ORDERS} open`, dot: false },
-    { icon: 'autorenew', label: 'Periodiek', sub: `${money(monthlyInvesting())} p/m`, dot: false },
-    { icon: 'balance', label: 'Balans', sub: devs ? `${devs} ${devs === 1 ? 'afwijking' : 'afwijkingen'}` : 'in balans', dot: devs > 0 },
+  const orders = { icon: 'pending_actions' as IconName, label: 'Orders', sub: live ? 'Oefenaccount' : `${OPEN_ORDERS} open`, dot: false, go: () => router.push('/orders') };
+  // Periodiek inleggen en herbalanceren komen later; met echte data tonen we alleen Orders.
+  const links: { icon: IconName; label: string; sub: string; dot: boolean; go: () => void }[] = live ? [orders] : [
+    orders,
+    { icon: 'autorenew', label: 'Periodiek', sub: `${money(monthlyInvesting())} p/m`, dot: false, go: soon },
+    { icon: 'balance', label: 'Balans', sub: devs ? `${devs} ${devs === 1 ? 'afwijking' : 'afwijkingen'}` : 'in balans', dot: devs > 0, go: soon },
   ];
   const watch = [...WATCHLIST].sort((a, b) => b.change - a.change);
   let rowIndex = 0;
@@ -56,12 +58,10 @@ export function Portfolio() {
       {live ? <View style={{ height: 16 }} /> : null}
       <ErrorBanner />
 
-      {/* Orders en periodiek inleggen bestaan pas vanaf stap 5–6; met echte data tonen we ze nog niet. */}
-      {!live ? (
-        <View style={{ flexDirection: 'row', gap: 6, paddingTop: 16, paddingHorizontal: 12 }}>
+      <View style={{ flexDirection: 'row', gap: 6, paddingTop: live ? 0 : 16, paddingHorizontal: 12 }}>
           {links.map((q, i) => (
             <FadeUp key={q.label} index={i} step={60} style={{ flex: 1, minWidth: 0 }}>
-              <Pressable onPress={soon} style={({ pressed }) => ({ backgroundColor: c.surface, borderRadius: 16, padding: 12, gap: 12, transform: [{ scale: pressed ? 0.97 : 1 }] })}>
+              <Pressable onPress={q.go} style={({ pressed }) => ({ backgroundColor: c.surface, borderRadius: 16, padding: 12, gap: 12, transform: [{ scale: pressed ? 0.97 : 1 }] })}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <Icon name={q.icon} size={20} color={c.accent} />
                   {q.dot ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: c.gold }} /> : null}
@@ -74,9 +74,8 @@ export function Portfolio() {
             </FadeUp>
           ))}
         </View>
-      ) : null}
 
-      <View style={{ flexDirection: 'row', gap: 8, paddingTop: live ? 4 : 16, paddingHorizontal: 24 }}>
+      <View style={{ flexDirection: 'row', gap: 8, paddingTop: 16, paddingHorizontal: 24 }}>
         <Segmented items={[['cat', 'Categorie'], ['src', 'Bron']]} value={view.group} onChange={(group) => setPortfolioView({ group })} />
         <Segmented items={[['dag', 'Dag'], ['tot', 'Totaal']]} value={view.metric} onChange={(metric) => setPortfolioView({ metric })} stretch={false} />
       </View>

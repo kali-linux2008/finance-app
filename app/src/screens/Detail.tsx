@@ -17,6 +17,8 @@ import { PER, PERIODS, portfolioSeries, positionSeries, type Period } from '../l
 import { useMoney } from '../hooks/useMoney';
 import { useApp, useColors } from '../state/app';
 import { useData } from '../state/data';
+import { useTrade } from '../state/trade';
+import { tradeVia } from '../lib/trade';
 
 export function Detail({ id }: { id: string }) {
   const c = useColors();
@@ -24,6 +26,7 @@ export function Detail({ id }: { id: string }) {
   const { say } = useApp();
   const { money, privacy, hide } = useMoney();
   const { positions, total, live, server } = useData();
+  const { openTrade } = useTrade();
   const found = positions.find((p) => p.id === id);
   const [period, setPeriod] = useState<Period>('1J');
   const [scrub, setScrub] = useState<number | null>(null);
@@ -208,12 +211,12 @@ export function Detail({ id }: { id: string }) {
         ) : null}
       </ScrollView>
 
-      {live ? null : pos.trade ? (
+      {tradeVia(pos, live) ? (
         <View style={{ flexDirection: 'row', gap: 8, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 + insets.bottom, borderTopWidth: 1, borderTopColor: c.line, backgroundColor: c.bg }}>
-          <Button label="Verkopen" variant="outline" onPress={() => say('Handelen komt in een volgende stap')} />
-          <Button label="Kopen" onPress={() => say('Handelen komt in een volgende stap')} />
+          <Button label="Verkopen" variant="outline" onPress={() => openTrade(pos.id, 'verkopen')} />
+          <Button label="Kopen" onPress={() => openTrade(pos.id, 'kopen')} />
         </View>
-      ) : (
+      ) : live ? null : (
         <View style={{ paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 + insets.bottom, borderTopWidth: 1, borderTopColor: c.line }}>
           <Button
             label={pos.manual ? 'Waarde bijwerken' : 'Geld overboeken'}

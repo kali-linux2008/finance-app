@@ -1,4 +1,5 @@
 from meridian import auth
+from meridian.store import Store
 
 
 def test_secret_is_encrypted_at_rest(store):
@@ -59,3 +60,16 @@ def test_success_line_keeps_source_name(capsys, monkeypatch):
     asyncio.run(cli._test("okx", {}))
     assert "Gelukt: OKX · € 0,00 in 0 posities" in capsys.readouterr().out
     assert cli.eur(1438.92) == "€ 1.438,92"
+
+
+def test_parallel_requests_do_not_break_the_database(tmp_path):
+    # De app vraagt soms twee dingen tegelijk; FastAPI draait die in aparte threads op één verbinding.
+    from concurrent.futures import ThreadPoolExecutor
+
+    from cryptography.fernet import Fernet
+
+    s = Store(tmp_path / "db.sqlite", key=Fernet.generate_key().decode())
+    token = auth.redeem_pair_code(s, auth.new_pair_code(s), "Pixel")
+    with ThreadPoolExecutor(8) as pool:
+        results = list(pool.map(lambda i: (auth.check_token(s, token), s.get_setting("x"), s.set_setting("y", i)), range(400)))
+    assert all(r[0] for r in results)

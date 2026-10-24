@@ -11,11 +11,13 @@ import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toast } from '../components/Toast';
+import { TradeSheet } from '../components/TradeSheet';
 import { Loading } from '../screens/Loading';
 import { LockScreen } from '../screens/LockScreen';
 import { AppProvider, useApp } from '../state/app';
 import { DataProvider } from '../state/data';
 import { LockProvider, useLock } from '../state/lock';
+import { TradeProvider } from '../state/trade';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -35,7 +37,9 @@ export default function RootLayout() {
         <AppProvider>
           <LockProvider>
             <DataProvider>
-              <Shell />
+              <TradeProvider>
+                <Shell />
+              </TradeProvider>
             </DataProvider>
           </LockProvider>
         </AppProvider>
@@ -61,6 +65,7 @@ function Shell() {
         // Eigen inschuif-animatie per scherm, daarom geen animatie van de stapel zelf.
         <Stack screenOptions={{ headerShown: false, animation: 'none', contentStyle: { backgroundColor: colors.bg } }} />
       ) : null}
+      {phase === 'open' ? <TradeSheet /> : null}
       <Toast />
     </View>
   );

@@ -114,7 +114,14 @@ export const PLANS: Plan[] = [
   { tk: 'BTC', amount: 190, freq: 'Maandelijks', active: true },
   { tk: 'ETH', amount: 25, freq: 'Wekelijks', active: false },
 ];
-export const OPEN_ORDERS = 3;
+/** Open limietorders uit het prototype (vorm zoals de server ze geeft). */
+export const SAMPLE_ORDERS = [
+  { id: 't212:o1', broker: 't212', symbol: 'ASML', tk: 'ASML', side: 'kopen', type: 'limiet', qty: 1, filled: 0, limit: 680, cur: 'EUR', status: 'NEW', created: null },
+  { id: 'okx:BTC-EUR:o2', broker: 'okx', symbol: 'BTC-EUR', tk: 'BTC', side: 'verkopen', type: 'limiet', qty: 0.01, filled: 0, limit: 98000, cur: 'EUR', status: 'live', created: null },
+  { id: 't212:o3', broker: 't212', symbol: 'NVDA', tk: 'NVDA', side: 'kopen', type: 'limiet', qty: 2, filled: 0, limit: 170, cur: 'USD', status: 'NEW', created: null },
+] as const;
+export const SAMPLE_ORDER_PRICES: Record<string, number> = { ASML: 702.8, BTC: 91810, NVDA: 182.4 };
+export const OPEN_ORDERS = SAMPLE_ORDERS.length;
 /** Doelverdeling voor herbalanceren, in %. */
 export const TARGETS: Record<Category, number> = { eq: 55, cr: 20, cash: 20, gold: 5 };
 

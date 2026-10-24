@@ -2,6 +2,7 @@
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useApp, useColors, type TabName } from '../state/app';
+import { useTrade } from '../state/trade';
 import { Icon, type IconName } from './Icon';
 import { T } from './T';
 
@@ -15,7 +16,8 @@ const TABS: [TabName, IconName, string][] = [
 export function NavBar() {
   const c = useColors();
   const insets = useSafeAreaInsets();
-  const { tab, goTab, say } = useApp();
+  const { tab, goTab } = useApp();
+  const { openTrade } = useTrade();
   return (
     <View style={{ position: 'absolute', left: 12, right: 12, bottom: 16 + insets.bottom, flexDirection: 'row', gap: 8, alignItems: 'center' }}>
       <View style={{ flex: 1, height: 64, borderRadius: 32, backgroundColor: c.nav, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.22)' }}>
@@ -33,7 +35,7 @@ export function NavBar() {
         )}
       </View>
       <Pressable
-        onPress={() => say('Handelen komt in een volgende stap')}
+        onPress={() => openTrade()}
         accessibilityLabel="Handelen"
         style={{ width: 64, height: 64, borderRadius: 32, backgroundImage: c.btnBg, boxShadow: `${c.btnShadow}, 0 8px 24px rgba(59,91,219,0.35)`, alignItems: 'center', justifyContent: 'center' }}
       >
