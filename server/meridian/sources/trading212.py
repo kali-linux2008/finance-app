@@ -4,6 +4,7 @@ Sleutels maak je in de app: Instellingen → API. Geef alleen leesrechten
 (account, portefeuille, metadata). Demo en echt geld hebben elk eigen sleutels.
 """
 
+import asyncio
 import base64
 import re
 import time
@@ -41,9 +42,30 @@ def short_ticker(t212_ticker: str) -> str:
     return re.sub(r"[a-z]+$", "", base) or base
 
 
+RATE_RETRIES = 3
+_sleep = asyncio.sleep  # te vervangen in tests
+
+
+def _wait_for(r: httpx.Response) -> float:
+    """Hoe lang wachten na een 429: Trading 212 zegt in x-ratelimit-reset wanneer het weer mag."""
+    try:
+        if reset := r.headers.get("x-ratelimit-reset"):
+            return min(max(float(reset) - time.time(), 1.0), 8.0)
+        if after := r.headers.get("retry-after"):
+            return min(max(float(after), 1.0), 8.0)
+    except ValueError:
+        pass
+    return 2.0
+
+
 async def request(client: httpx.AsyncClient, base: str, method: str, path: str, headers: dict,
                   body: dict | None = None) -> object:
-    r = await client.request(method, base + path, headers=headers, json=body)
+    # Bij 429 is het verzoek niet uitgevoerd (ook geen order), dus opnieuw proberen is veilig.
+    for attempt in range(RATE_RETRIES + 1):
+        r = await client.request(method, base + path, headers=headers, json=body)
+        if r.status_code != 429 or attempt == RATE_RETRIES:
+            break
+        await _sleep(_wait_for(r))
     if r.status_code == 401:
         raise T212Error("Trading 212 weigert de sleutel (401). Klopt de sleutel en het geheim?")
     if r.status_code == 403:
@@ -65,9 +87,22 @@ def _reason(r: httpx.Response) -> str:
     except ValueError:
         return ""
     if isinstance(body, dict):
-        text = body.get("clarification") or body.get("message") or body.get("code") or body.get("type")
+        kind = str(body.get("type") or body.get("code") or "")
+        for key, nl in KNOWN_ERRORS.items():
+            if kind.endswith(key):
+                return f": {nl}"
+        text = body.get("clarification") or body.get("detail") or body.get("title") or body.get("message") or kind
         return f": {text}" if text else ""
     return ""
+
+
+# Veelvoorkomende weigeringen in gewone taal (Trading 212 geeft ze als "/api-errors/<naam>").
+KNOWN_ERRORS = {
+    "min-quantity-exceeded": "het aantal is kleiner dan het minimum dat Trading 212 voor dit aandeel toestaat. Kies een groter bedrag.",
+    "max-quantity-exceeded": "het aantal is groter dan Trading 212 in één order toestaat.",
+    "insufficient-funds": "niet genoeg vrij saldo.",
+    "InsufficientFreeForStocksBuy": "niet genoeg vrij saldo.",
+}
 
 
 async def _get(client: httpx.AsyncClient, base: str, path: str, headers: dict) -> object:

@@ -28,6 +28,11 @@ def setup(monkeypatch, store):
         return {"positions": POSITIONS}
     monkeypatch.setattr(portfolio, "build", build)
     trading._pairs.clear()
+    trading._accounts.clear()
+    import time as _t
+    meta = {"VWCEd_EQ": {"ticker": "VWCEd_EQ", "minTradeQuantity": 0.01}, "AAPL_US_EQ": {"ticker": "AAPL_US_EQ", "minTradeQuantity": 0.01}}
+    for base in (trading212.DEMO, trading212.LIVE):
+        trading212._meta[base] = (_t.time(), meta)
     store.set_secret("t212.handel", {"key": "K", "secret": "S", "demo": True})
     store.set_secret("okx.handel", {"key": "K", "secret": "S", "passphrase": "P", "demo": True, "domain": OKX})
 
@@ -229,3 +234,26 @@ async def test_real_money_only_when_switched_on_with_its_own_low_day_max(store):
     assert order.call_count == 1
     assert trading.used_today(store, demo=False) == 20 and trading.used_today(store) == 0  # apart geteld
     assert q["demo"] is False and q["dayMax"] == 25 and q["usedToday"] == 20 and q["limitAllowed"] is False
+
+
+
+@respx.mock
+async def test_t212_minimum_quantity_is_checked_before_sending(store):
+    t212_account()
+    trading212._meta[T212][1]["VWCEd_EQ"]["minTradeQuantity"] = 0.5
+    order = respx.post(f"{T212}/equity/orders/market").respond(json={"id": 1})
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(trading.TradeError, match="minimaal 0.5 stuks, ongeveer € 64,66"):
+            await trading.place(store, c, req(amount=5))
+        q = await trading.quote(store, c, "t212-VWCEd_EQ")
+    assert not order.called and q["minQty"] == 0.5 and q["minAmount"] == 64.67
+
+
+@respx.mock
+async def test_t212_rejection_is_explained_in_dutch(store):
+    t212_account()
+    trading212._meta[T212][1]["VWCEd_EQ"]["minTradeQuantity"] = 0
+    respx.post(f"{T212}/equity/orders/market").respond(400, json={"type": "/api-errors/min-quantity-exceeded"})
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(trading.TradeError, match="kleiner dan het minimum"):
+            await trading.place(store, c, req(amount=5))

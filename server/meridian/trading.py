@@ -128,9 +128,18 @@ def _t212(secret: dict) -> tuple[str, dict]:
     return base, trading212.auth_header(secret["key"], secret.get("secret"))
 
 
+# Kort onthouden: het handelsvenster vraagt dit op, en de order een paar tellen later weer.
+# Trading 212 staat maar weinig verzoeken per sleutel toe (en de leesbron gebruikt soms dezelfde sleutel).
+ACCOUNT_TTL = 10.0
+_accounts: dict[tuple[str, str, str], tuple[float, float, float]] = {}
+
+
 async def _t212_account(client: httpx.AsyncClient, secret: dict, symbol: str) -> tuple[float, float]:
     """(stuks van dit instrument, vrij saldo in euro) op het handelsaccount."""
     base, headers = _t212(secret)
+    key = (base, secret["key"], symbol)
+    if (hit := _accounts.get(key)) and time.time() - hit[0] < ACCOUNT_TTL:
+        return hit[1], hit[2]
     try:
         rows = await trading212.request(client, base, "GET", "/equity/positions", headers)
         qty = sum(float(r.get("quantity") or 0) for r in rows if (r.get("instrument") or {}).get("ticker") == symbol)
@@ -143,7 +152,15 @@ async def _t212_account(client: httpx.AsyncClient, secret: dict, symbol: str) ->
     except trading212.T212NotFound:
         c = await trading212.request(client, base, "GET", "/equity/account/cash", headers)
         cash = float(c.get("free") or 0)
+    _accounts[key] = (time.time(), qty, cash)
     return qty, cash
+
+
+async def _t212_min_qty(client: httpx.AsyncClient, secret: dict, symbol: str) -> float:
+    """Kleinste aantal dat Trading 212 voor dit instrument accepteert (0 als onbekend)."""
+    base, headers = _t212(secret)
+    meta = await trading212._instruments(client, base, headers)
+    return float((meta.get(symbol) or {}).get("minTradeQuantity") or 0)
 
 
 async def _t212_place(client: httpx.AsyncClient, secret: dict, symbol: str, qty: float, limit: float | None) -> dict:
@@ -273,7 +290,9 @@ async def quote(store: Store, client: httpx.AsyncClient, pos_id: str) -> dict:
     try:
         if prod.broker == "t212":
             qty, cash = await _t212_account(client, secret, prod.symbol)
-            out.update(sellQty=qty, sellMax=round(qty * prod.eur_per_unit, 2), cash=round(cash, 2))
+            min_qty = await _t212_min_qty(client, secret, prod.symbol)
+            out.update(sellQty=qty, sellMax=round(qty * prod.eur_per_unit, 2), cash=round(cash, 2), minQty=min_qty,
+                       minAmount=max(MIN_EUR, math.ceil(min_qty * prod.eur_per_unit * 1.01 * 100) / 100))
         else:
             pair = await _okx_pair(client, secret, prod.symbol)
             rate = await _quote_eur(client, pair["quote"])
@@ -345,8 +364,13 @@ async def _place_t212(client: httpx.AsyncClient, secret: dict, prod: Product, re
             raise TradeError(f"Je kunt hooguit {_eur(have)} verkopen.")
         qty = held if req.amount >= have * 0.99 else req.amount / per_unit  # (bijna) alles: alles verkopen
         qty = -qty
+    min_qty = await _t212_min_qty(client, secret, prod.symbol)
+    if abs(qty) < min_qty and not (req.side == "verkopen" and abs(qty) == held):
+        raise TradeError(f"Te klein voor {prod.tk} bij Trading 212: minimaal {min_qty:g} stuks, "
+                         f"ongeveer {_eur(min_qty * per_unit * 1.01)}.")
     limit = prod.price * factor if req.type == "limiet" else None
     res = await _t212_place(client, secret, prod.symbol, qty, limit)
+    _accounts.clear()  # saldo en positie zijn nu veranderd
     return {**res, "limit": limit}
 
 

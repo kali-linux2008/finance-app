@@ -48,6 +48,7 @@ describe('estimate', () => {
   it('meldt minimum, vrij saldo, geen bezit en dagmaximum', () => {
     expect(estimate(live(), 'kopen', 0, 'markt', 0).error).toBe('Voer een bedrag in');
     expect(estimate(live(), 'kopen', 0.5, 'markt', 0).error).toBe('Minimaal € 1');
+    expect(estimate(live({ minAmount: 64.67 }), 'kopen', 5, 'markt', 0).error).toBe('Minimaal € 64,67 voor VWCE');
     expect(estimate(live({ cash: 50 }), 'kopen', 60, 'markt', 0).error).toBe('Vrij saldo € 50,00');
     expect(estimate(live({ sellMax: 0 }), 'verkopen', 10, 'markt', 0).error).toBe('Je hebt geen VWCE op Trading 212');
     expect(estimate(live({ usedToday: 200 }), 'kopen', 100, 'markt', 0).error).toBe('Dagmaximum: nog € 50,00 vandaag');
