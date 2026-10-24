@@ -1,10 +1,16 @@
 # Meridian — app (Expo)
 
-De Android-app van Meridian, gebouwd met Expo (React Native) en TypeScript. Klaar zijn **stap 1–3** uit `docs/ADVIES-STACK.md`: het thema (donker en licht), de schermen Overzicht, Portefeuille en Detail, en het vergrendelscherm met pincode en vingerafdruk. Alles volgt `design/Vermogen App v4.dc.html`. Alle bedragen zijn nog voorbeelddata.
+De Android-app van Meridian, gebouwd met Expo (React Native) en TypeScript. Klaar zijn **stap 1–4** uit `docs/ADVIES-STACK.md`: het thema (donker en licht), de schermen Overzicht, Portefeuille en Detail, het vergrendelscherm met pincode en vingerafdruk, en de koppeling met je eigen server voor echte data. Alles volgt `design/Vermogen App v4.dc.html`. Zonder gekoppelde server toont de app voorbeelddata.
 
 **Nieuw met programmeren?** Volg `docs/STARTEN.md`: Node.js, Git en Expo Go installeren en de app op je telefoon openen, stap voor stap.
 
 ## Wat werkt
+- **Echte data:** via Meer → Server koppel je de app met je eigen Meridian-server (zie `docs/SERVER.md`). Daarna:
+  - tonen Overzicht, Portefeuille en Detail je echte posities, met elke minuut een update en omlaag trekken om te verversen;
+  - bouwt de grafiek zich op uit het verloop dat de server bijhoudt; crypto heeft een echte koersgrafiek;
+  - zie je een melding als de server of een bron niet bereikbaar is.
+
+  Wat nog geen echte bron heeft, verbergen we in plaats van verzonnen cijfers te tonen: orders, periodiek inleggen, volglijst, transacties, kosten en Box 3.
 - **Vergrendelscherm:**
   - De eerste keer kies je een pincode van 5 cijfers en herhaal je die. Te makkelijke codes zoals 12345 of 11111 worden geweigerd.
   - Daarna open je de app met je vingerafdruk of je pincode. Na 5 foute pogingen moet je 30 seconden wachten, daarna steeds langer.
@@ -46,7 +52,7 @@ src/components/  Hero, LineChart, NavBar, Toast, Icon, T (tekst), ui (kaarten, k
 src/theme/       kleuren voor donker/licht (uit docs/tokens.json), lettertypen, ruimte, beweging
 src/data/        voorbeelddata uit het prototype
 src/lib/         opmaak (nl-NL), grafiekreeksen, portefeuille-berekeningen, pincoderegels, opslag + tests
-src/state/       app-status (thema, privacy, tab) en vergrendeling (pincode, vingerafdruk)
+src/state/       app-status (thema, privacy, tab), vergrendeling (pincode, vingerafdruk), data (server of voorbeeld)
 scripts/         generate-icons.mjs: zet Material Symbols om naar src/components/iconPaths.ts
 ```
 

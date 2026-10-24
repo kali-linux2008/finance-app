@@ -23,4 +23,5 @@ export const KEYS = {
   pin: 'meridian.pin',
   failures: 'meridian.pinFailures',
   biometric: 'meridian.biometric',
+  server: 'meridian.server',
 };

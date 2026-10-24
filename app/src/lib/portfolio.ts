@@ -1,8 +1,5 @@
 // Afgeleide cijfers voor Overzicht en Portefeuille. Puur (geen React), zodat het te testen is.
-import {
-  PLANS, POSITIONS, TARGETS, TOTAL,
-  type Category, type Plan, type Position,
-} from '../data/sample';
+import { PLANS, TARGETS, type Category, type Plan, type Position } from '../data/sample';
 
 export const CATEGORY_NAMES: [Category, string][] = [
   ['eq', "Aandelen & ETF's"],
@@ -11,12 +8,12 @@ export const CATEGORY_NAMES: [Category, string][] = [
   ['gold', 'Goud'],
 ];
 
-export function sumCategory(cat: Category, list: Position[] = POSITIONS): number {
+export function sumCategory(list: Position[], cat: Category): number {
   return list.filter((p) => p.cat === cat).reduce((a, p) => a + p.value, 0);
 }
 
 /** Belegd (alles met een aankoopprijs) en wat het gekost heeft. */
-export function investedAndCost(list: Position[] = POSITIONS) {
+export function investedAndCost(list: Position[]) {
   const withCost = list.filter((p) => p.cost);
   return {
     invested: withCost.reduce((a, p) => a + p.value, 0),
@@ -43,33 +40,29 @@ export function matchesFilter(p: Position, f: Filter): boolean {
 export type GroupRow = { position: Position; override?: { name: string; sub: string; value: number } };
 export type Group = { name: string; total: number; rows: GroupRow[] };
 
-export function groupByCategory(f: Filter): Group[] {
+export function groupByCategory(list: Position[], f: Filter): Group[] {
   return CATEGORY_NAMES.map(([cat, name]) => {
-    const rows = POSITIONS.filter((p) => p.cat === cat && matchesFilter(p, f)).map((position) => ({ position }));
+    const rows = list.filter((p) => p.cat === cat && matchesFilter(p, f)).map((position) => ({ position }));
     return { name, total: rows.reduce((a, r) => a + r.position.value, 0), rows };
   }).filter((g) => g.rows.length);
 }
 
-export function groupBySource(f: Filter): Group[] {
-  const get = (id: string) => POSITIONS.find((p) => p.id === id)!;
-  const btc = get('btc');
-  const def: [string, GroupRow[]][] = [
-    ['Trading 212', ['vwce', 'sxr8', 'asml', 'aapl'].map((id) => ({ position: get(id) }))],
-    ['OKX', [
-      { position: btc, override: { name: 'Bitcoin', sub: '0,0377 BTC · OKX', value: 3461 } },
-      { position: get('eth') },
-      { position: get('sol') },
-    ]],
-    ['Trezor Safe 5', [{ position: btc, override: { name: 'Bitcoin', sub: '0,1075 BTC · cold storage', value: 9870 } }]],
-    ['ING', [{ position: get('spaar') }, { position: get('betaal') }]],
-    ['Handmatig', [{ position: get('goud') }]],
-  ];
-  return def
-    .map(([name, list]) => {
-      const rows = list.filter((r) => matchesFilter(r.position, f));
-      return { name, total: rows.reduce((a, r) => a + (r.override?.value ?? r.position.value), 0), rows };
-    })
-    .filter((g) => g.rows.length);
+/** Per bron. Een munt op meerdere plekken (BTC op Trezor én OKX) staat bij elke plek met zijn eigen deel. */
+export function groupBySource(list: Position[], f: Filter): Group[] {
+  const groups = new Map<string, GroupRow[]>();
+  const add = (src: string, row: GroupRow) => groups.set(src, [...(groups.get(src) ?? []), row]);
+  for (const p of list.filter((x) => matchesFilter(x, f))) {
+    if (p.wallets?.length) {
+      for (const w of p.wallets) {
+        add(w.name, { position: p, override: { name: p.name, sub: `${w.qty} · ${w.icon === 'lock' ? 'cold storage' : w.name}`, value: w.value } });
+      }
+    } else {
+      add(p.src, { position: p });
+    }
+  }
+  return [...groups].map(([name, rows]) => ({
+    name, rows, total: rows.reduce((a, r) => a + (r.override?.value ?? r.position.value), 0),
+  }));
 }
 
 /** Bedrag per maand van een plan; wekelijks telt als 52/12 keer per maand. */
@@ -80,6 +73,22 @@ export function monthlyInvesting(plans: Plan[] = PLANS): number {
 }
 
 /** Aantal klassen dat meer dan 5 procentpunt van het doel afwijkt. */
-export function rebalanceDeviations(targets = TARGETS, total = TOTAL): number {
-  return CATEGORY_NAMES.filter(([cat]) => Math.abs((sumCategory(cat) / total) * 100 - targets[cat]) > 5).length;
+export function rebalanceDeviations(list: Position[], total: number, targets = TARGETS): number {
+  if (!total) return 0;
+  return CATEGORY_NAMES.filter(([cat]) => Math.abs((sumCategory(list, cat) / total) * 100 - targets[cat]) > 5).length;
+}
+
+/** Bedragen voor "Waar het staat": per klasse, met spaargeld en betaalgeld apart, plus de bronnen erachter. */
+export function allocation(list: Position[]) {
+  const sources = (cat: Category) => [...new Set(list.filter((p) => p.cat === cat).flatMap((p) => p.wallets?.map((w) => w.name) ?? [p.src]))];
+  const cash = list.filter((p) => p.cat === 'cash');
+  return {
+    eq: sumCategory(list, 'eq'),
+    cr: sumCategory(list, 'cr'),
+    gold: sumCategory(list, 'gold'),
+    savings: cash.filter((p) => p.tile === 3).reduce((a, p) => a + p.value, 0),
+    payment: cash.filter((p) => p.tile !== 3).reduce((a, p) => a + p.value, 0),
+    eqSources: sources('eq'),
+    crSources: sources('cr'),
+  };
 }
