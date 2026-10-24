@@ -24,6 +24,10 @@ type LockState = {
   setupPin: (pin: string) => Promise<void>;
   submitPin: (pin: string) => Promise<PinResult>;
   unlockWithBiometric: () => Promise<boolean>;
+  /** Pincode controleren zonder te ontgrendelen (bijv. om een order te bevestigen). Telt mee voor de wachttijd. */
+  verifyPin: (pin: string) => Promise<PinResult>;
+  /** Vingerafdruk vragen om iets te bevestigen; false als dat niet kan of mislukt. */
+  confirmBiometric: (prompt: string) => Promise<boolean>;
   lock: () => void;
 };
 
@@ -91,17 +95,28 @@ export function LockProvider({ children }: { children: ReactNode }) {
     finishUnlock();
   }, [finishUnlock, saveFailures]);
 
-  const submitPin = useCallback(async (pin: string): Promise<PinResult> => {
+  const verifyPin = useCallback(async (pin: string): Promise<PinResult> => {
     if (lockoutRemaining(failures.n, failures.at, Date.now()) > 0) return 'wait';
     const rec = parsePinRecord((await getItem(KEYS.pin)) ?? '');
     if (rec && (await hash(rec.salt, pin)) === rec.hash) {
       saveFailures({ n: 0, at: 0 });
-      finishUnlock();
       return 'ok';
     }
     saveFailures({ n: failures.n + 1, at: Date.now() });
     return 'wrong';
-  }, [failures, finishUnlock, saveFailures]);
+  }, [failures, saveFailures]);
+
+  const submitPin = useCallback(async (pin: string): Promise<PinResult> => {
+    const r = await verifyPin(pin);
+    if (r === 'ok') finishUnlock();
+    return r;
+  }, [verifyPin, finishUnlock]);
+
+  const confirmBiometric = useCallback(async (prompt: string) => {
+    if (!biometricAvailable || !biometricEnabled) return false;
+    const r = await LocalAuthentication.authenticateAsync({ promptMessage: prompt, cancelLabel: 'Pincode gebruiken', disableDeviceFallback: true });
+    return r.success;
+  }, [biometricAvailable, biometricEnabled]);
 
   const unlockWithBiometric = useCallback(async () => {
     if (!biometricAvailable || !biometricEnabled) return false;
@@ -145,8 +160,8 @@ export function LockProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<LockState>(() => ({
     phase, waitUntil, biometricAvailable, biometricEnabled, setBiometricEnabled,
-    setupPin, submitPin, unlockWithBiometric, lock,
-  }), [phase, waitUntil, biometricAvailable, biometricEnabled, setBiometricEnabled, setupPin, submitPin, unlockWithBiometric, lock]);
+    setupPin, submitPin, unlockWithBiometric, verifyPin, confirmBiometric, lock,
+  }), [phase, waitUntil, biometricAvailable, biometricEnabled, setBiometricEnabled, setupPin, submitPin, unlockWithBiometric, verifyPin, confirmBiometric, lock]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

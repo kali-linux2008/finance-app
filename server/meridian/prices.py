@@ -96,3 +96,17 @@ async def candles(client: httpx.AsyncClient, ccy: str, period: str) -> list[tupl
         points += [(int(row[0]) / 1000, float(row[4]) * factor) for row in rows]
         after = rows[-1][0]
     return sorted(points[:limit])
+
+
+async def ohlc(client: httpx.AsyncClient, ccy: str, bar: str = "15m", limit: int = 40) -> list[dict]:
+    """Candles met volume voor het handelsscherm, oud → nieuw, koersen in euro."""
+    inst, factor = f"{ccy}-EUR", 1.0
+    if not await ticker(client, inst):
+        inst, factor = f"{ccy}-USDT", await _usdt_eur(client)
+    try:
+        r = await client.get(f"{config.OKX_URL}/api/v5/market/candles", params={"instId": inst, "bar": bar, "limit": str(limit)})
+        rows = r.json().get("data") or []
+    except (httpx.HTTPError, ValueError) as e:
+        raise PriceError("Koersdienst (OKX) is niet bereikbaar") from e
+    return [{"t": int(row[0]) / 1000, "o": float(row[1]) * factor, "h": float(row[2]) * factor,
+             "l": float(row[3]) * factor, "c": float(row[4]) * factor, "v": float(row[5])} for row in reversed(rows)]

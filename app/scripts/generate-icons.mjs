@@ -9,7 +9,7 @@ const NAMES = [
   'pending_actions', 'autorenew', 'balance', 'add', 'arrow_back', 'notification_add', 'lock',
   'currency_exchange', 'payments', 'edit', 'chevron_right', 'calendar_month', 'summarize',
   'insights=search_insights', 'link', 'candlestick_chart', 'account_balance', 'edit_note', 'construction',
-  'fingerprint', 'backspace', 'sync',
+  'fingerprint', 'backspace', 'sync', 'check', 'remove', 'expand_more=keyboard_arrow_down', 'close', 'science',
 ];
 
 const pkg = process.argv[2];

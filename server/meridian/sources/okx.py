@@ -7,6 +7,7 @@ opnemen nooit). Bij demo-sleutels zet de server de demo-modus aan.
 import base64
 import hashlib
 import hmac
+import json
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
@@ -39,26 +40,36 @@ def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-async def _get(client: httpx.AsyncClient, secret: dict, path: str, params: dict | None = None) -> list:
+async def request(client: httpx.AsyncClient, secret: dict, method: str, path: str,
+                  params: dict | None = None, body: dict | None = None) -> list:
+    """Ondertekend verzoek aan OKX. Bij demo-sleutels gaat de header voor demo-handel mee."""
     if params:
         path += "?" + urlencode(params)
+    payload = json.dumps(body) if body is not None else ""
     ts = _timestamp()
     headers = {
         "OK-ACCESS-KEY": secret["key"],
-        "OK-ACCESS-SIGN": sign(secret["secret"], ts, "GET", path),
+        "OK-ACCESS-SIGN": sign(secret["secret"], ts, method, path, payload),
         "OK-ACCESS-TIMESTAMP": ts,
         "OK-ACCESS-PASSPHRASE": secret["passphrase"],
         "Content-Type": "application/json",
     }
     if secret.get("demo"):
         headers["x-simulated-trading"] = "1"
-    r = await client.get(secret.get("domain", config.OKX_URL) + path, headers=headers)
-    body = r.json()
-    if body.get("code") != "0":
-        code = str(body.get("code"))
+    r = await client.request(method, secret.get("domain", config.OKX_URL) + path, headers=headers, content=payload or None)
+    data = r.json()
+    if data.get("code") != "0":
+        code = str(data.get("code"))
+        # Bij orders staat de echte reden per regel in data[].sMsg.
+        rows = data.get("data") or []
+        detail = next((d.get("sMsg") for d in rows if isinstance(d, dict) and d.get("sMsg")), None)
         hint = " Je sleutel hoort bij een andere OKX-regio; voeg de bron opnieuw toe." if code == WRONG_REGION else ""
-        raise OkxError(f"OKX: {body.get('msg') or 'onbekende fout'} (code {code}).{hint}", code)
-    return body.get("data") or []
+        raise OkxError(f"OKX: {detail or data.get('msg') or 'onbekende fout'} (code {code}).{hint}", code)
+    return data.get("data") or []
+
+
+async def _get(client: httpx.AsyncClient, secret: dict, path: str, params: dict | None = None) -> list:
+    return await request(client, secret, "GET", path, params)
 
 
 async def find_domain(client: httpx.AsyncClient, secret: dict) -> str:

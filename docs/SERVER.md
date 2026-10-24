@@ -79,7 +79,7 @@ Alle opdrachten hieronder beginnen met `docker compose exec meridian`. Typ ze in
 
 ### Trading 212
 1. Open Trading 212 → **Instellingen → API (bèta)** → **Generate API key**.
-2. Zet alleen de **leesrechten** aan: *Account data*, *Metadata* en *Portfolio*. Laat *Orders* nog uit (dat is stap 5).
+2. Zet alleen de **leesrechten** aan: *Account data*, *Metadata* en *Portfolio*. Laat *Orders* uit: voor handelen maak je een aparte sleutel (zie stap 8).
 3. Optioneel, maar slim: beperk de sleutel tot het IP-adres van je thuisnetwerk.
 4. Kopieer de sleutel en het geheim. Het geheim zie je maar één keer.
 
@@ -149,6 +149,42 @@ Met [Tailscale](https://tailscale.com) maak je een privé-netwerk tussen je serv
 2. Op je telefoon: installeer de Tailscale-app en log in met hetzelfde account.
 3. Gebruik in Meridian het Tailscale-adres van je server (bijv. `100.x.y.z:8000`, te zien met `tailscale ip -4`).
 
+## 8. Handelen met oefengeld (demo)
+
+Vanuit de app kun je kopen en verkopen via de Handelen-knop of via Kopen/Verkopen op een belegging. **In deze versie gaat dat alleen naar je oefenaccounts**, dus zonder echt geld. Daarvoor heeft de server aparte **handelssleutels** nodig. Je leessleutels blijven alleen-lezen.
+
+### Trading 212 (Practice)
+1. Open Trading 212 en wissel bovenin naar je **oefenaccount (Practice)**.
+2. **Instellingen → API (bèta) → Generate API key**. Rechten: *Account data*, *Metadata*, *Portfolio* en *Orders*.
+3. Op de server:
+   ```bash
+   docker compose exec meridian python -m meridian bron trading212-handel
+   ```
+
+### OKX (Demo trading)
+1. OKX → **Trade → Demo trading**. Daarna in je profiel: **Demo trading API → Create API key**.
+2. Rechten: **Read** en **Trade**. **Nooit Withdraw.**
+3. Op de server:
+   ```bash
+   docker compose exec meridian python -m meridian bron okx-handel
+   ```
+
+### Veiligheid
+- Elke order bevestig je in de app met je vingerafdruk of pincode.
+- De server controleert elke order opnieuw: minimaal € 1, verkopen niet meer dan er op het oefenaccount staat (bij bitcoin alleen het OKX-deel, de Trezor is alleen-lezen), kopen niet meer dan het vrije saldo, en een **dagmaximum** (standaard € 250).
+- Elke poging komt in het orderlogboek, ook als hij mislukt. Bekijken:
+  ```bash
+  docker compose exec meridian python -m meridian handel
+  ```
+- Dagmaximum aanpassen, bijvoorbeeld naar € 500:
+  ```bash
+  docker compose exec meridian python -m meridian handel maximum 500
+  ```
+- Handelssleutel weghalen: `python -m meridian bron weg trading212-handel` (of `okx-handel`).
+- Echt geld kan de server nog niet. Dat komt later, als aparte stap die je zelf bewust aanzet.
+
+Lopende limietorders zie je in de app onder **Portefeuille → Orders**. Daar kun je de limiet wijzigen of de order annuleren.
+
 ## Bijwerken
 
 ```bash
@@ -186,6 +222,9 @@ docker compose restart
 | OKX: "Invalid Sign" of "Invalid OK-ACCESS-PASSPHRASE" | Secret of passphrase verkeerd geplakt; voeg de bron opnieuw toe. |
 | OKX: "API key doesn't exist" (50119) | De sleutel hoort bij een andere OKX-regio. De server zoekt die zelf (Europa = eea.okx.com); lukt dat niet, dan is de sleutel fout of gemaakt in de demo-omgeving (gebruik dan `--demo`). |
 | Trezor-saldo klopt niet | Controleer of je de sleutel van het juiste account hebt (Native SegWit, Taproot of Legacy). Heb je meerdere accounts, dan telt alleen dit ene mee. |
+| Handelen: "Nog geen handelssleutel" | Voeg de handelssleutel toe (stap 8). De leessleutel kan niet handelen. |
+| Handelen: "Dagmaximum bereikt" | Wacht tot morgen of verhoog het maximum met `handel maximum <bedrag>`. |
+| Trading 212: "mist het recht Orders" (403) | Maak de Practice-sleutel opnieuw, met het recht *Orders* aan. |
 | Logboek bekijken | `docker compose logs -f meridian` |
 
 ## Zonder Docker (bijv. op je Windows-pc om te proberen)

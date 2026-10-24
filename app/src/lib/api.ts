@@ -1,6 +1,7 @@
 // Praten met je eigen Meridian-server. Elk verzoek heeft een tijdslimiet en een begrijpelijke foutmelding.
 import type { Outside, Position, Source } from '../data/sample';
 import type { Period } from './series';
+import type { Candle, OrderType, Quote, Side } from './trade';
 
 export type ServerConfig = { url: string; token: string };
 
@@ -76,3 +77,36 @@ export const getHistory = async (cfg: ServerConfig, period: Period) =>
 
 export const getCandles = async (cfg: ServerConfig, ccy: string, period: Period) =>
   (await request<{ points: Point[] }>(`${cfg.url}/api/candles/${encodeURIComponent(ccy)}?period=${period}`, auth(cfg), 20000)).points;
+
+// Handelen (oefenaccount). De server controleert alles nog een keer; de app is alleen het scherm.
+export type TradeInfo = { connected: { t212: boolean; okx: boolean }; live: boolean; dayMax: number; usedToday: number };
+export type OrderResult = { ok: boolean; demo: boolean; broker: string; brokerName: string; orderId: string | null; qty: number | null; limit: number | null; message: string | null };
+export type OpenOrder = {
+  id: string; broker: 't212' | 'okx'; symbol: string; tk: string; side: 'kopen' | 'verkopen'; type: 'markt' | 'limiet';
+  qty: number; filled: number; limit: number | null; cur?: string; status: string; created: string | number | null;
+};
+export type Broker = { id: 't212' | 'okx'; name: string; connected: boolean; demo: boolean; error: string | null };
+
+const post = (cfg: ServerConfig, body: unknown) => ({
+  method: 'POST',
+  headers: { Authorization: `Bearer ${cfg.token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+export const getTradeQuote = (cfg: ServerConfig, posId: string) =>
+  request<Quote>(`${cfg.url}/api/handel/positie/${encodeURIComponent(posId)}`, auth(cfg), 30000);
+
+export const getOhlc = async (cfg: ServerConfig, ccy: string) =>
+  (await request<{ candles: (Candle & { t: number })[] }>(`${cfg.url}/api/candles/${encodeURIComponent(ccy)}/ohlc`, auth(cfg))).candles;
+
+export const placeOrder = (cfg: ServerConfig, o: { posId: string; side: Side; amount: number; type: OrderType; limitPct: number; requestId: string }) =>
+  request<OrderResult>(`${cfg.url}/api/handel/order`, post(cfg, o), 30000);
+
+export const getOrders = (cfg: ServerConfig) =>
+  request<{ orders: OpenOrder[]; brokers: Broker[] }>(`${cfg.url}/api/handel/orders`, auth(cfg), 30000);
+
+export const cancelOrder = (cfg: ServerConfig, id: string) =>
+  request<{ ok: boolean }>(`${cfg.url}/api/handel/orders/annuleer`, post(cfg, { id }), 30000);
+
+export const amendOrder = (cfg: ServerConfig, id: string, limit: number) =>
+  request<{ ok: boolean; id: string }>(`${cfg.url}/api/handel/orders/limiet`, post(cfg, { id, limit }), 30000);

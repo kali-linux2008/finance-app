@@ -24,14 +24,19 @@ HELP = """Meridian-server beheren
   python -m meridian bron trading212       API-sleutel van Trading 212 opslaan (--demo voor oefenaccount)
   python -m meridian bron okx              API-sleutel van OKX opslaan (--demo voor demo-handel)
   python -m meridian bron trezor           publieke sleutel (xpub/zpub) van je Trezor opslaan
-  python -m meridian bron weg <naam>       koppeling verwijderen (trading212, okx of trezor)
+  python -m meridian bron trading212-handel  handelssleutel van je Trading 212-oefenaccount (Practice)
+  python -m meridian bron okx-handel       handelssleutel van OKX Demo trading
+  python -m meridian bron weg <naam>       koppeling verwijderen (bijv. trading212 of okx-handel)
   python -m meridian handmatig             banksaldi (Rabobank), goud, pensioen en woning invullen
   python -m meridian status                alles ophalen en een overzicht tonen
+  python -m meridian handel                handelen: sleutels, dagmaximum en het orderlogboek
+  python -m meridian handel maximum 250    dagmaximum voor handelen in euro instellen
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
 
-SOURCE_IDS = {"trading212": "t212", "t212": "t212", "okx": "okx", "trezor": "trezor"}
+SOURCE_IDS = {"trading212": "t212", "t212": "t212", "okx": "okx", "trezor": "trezor",
+              "trading212-handel": "t212.handel", "okx-handel": "okx.handel"}
 
 
 def clean(text: str) -> str:
@@ -108,13 +113,16 @@ def cmd_source(args: list[str]) -> None:
     if args[0] == "weg":
         sid = SOURCE_IDS.get(args[1] if len(args) > 1 else "")
         if not sid:
-            print("Welke? trading212, okx of trezor")
+            print("Welke? trading212, okx, trezor, trading212-handel of okx-handel")
             return
         s.delete_secret(sid)
         print("Koppeling verwijderd.")
         return
     sid = SOURCE_IDS.get(args[0])
     demo = "--demo" in args
+    if sid in ("t212.handel", "okx.handel"):
+        add_trade_key(s, sid)
+        return
     if sid == "t212":
         print("Trading 212 → Instellingen → API: maak een sleutel met alleen leesrechten.")
         secret = {"key": ask("API-sleutel", secret=True), "secret": ask("API-geheim", secret=True), "demo": demo}
@@ -148,6 +156,74 @@ def cmd_source(args: list[str]) -> None:
             return
     s.set_secret(sid, secret)
     print("Opgeslagen (versleuteld).")
+
+
+def add_trade_key(s: Store, sid: str) -> None:
+    """Handelssleutel opslaan. In deze versie alleen voor oefengeld; de leessleutel blijft apart."""
+    print("Let op: deze sleutel mag kopen en verkopen. In deze versie werkt dat alleen met oefengeld (demo).")
+    if sid == "t212.handel":
+        print("Trading 212 → wissel naar je oefenaccount (Practice) → Instellingen → API.")
+        print("Rechten: Account data, Metadata, Portfolio en Orders.")
+        secret = {"key": ask("API-sleutel", secret=True), "secret": ask("API-geheim", secret=True), "demo": True}
+        test = trading212.fetch
+    else:
+        print("OKX → Trade → Demo trading → Profiel → Demo trading API → Create API key.")
+        print("Rechten: Read en Trade. Nooit Withdraw.")
+        secret = {"key": ask("API-sleutel", secret=True), "secret": ask("Secret", secret=True),
+                  "passphrase": ask("Passphrase", secret=True), "demo": True}
+        print("OKX-regio zoeken…")
+        try:
+            async def detect() -> str:
+                async with httpx.AsyncClient(timeout=20) as c:
+                    return await okx.find_domain(c, secret)
+            secret["domain"] = asyncio.run(detect())
+            print(f"Gevonden: {secret['domain']}")
+        except Exception as e:
+            print("Mislukt:", describe(e))
+            return
+        test = okx.fetch
+    print("Verbinding testen…")
+    try:
+        async def run():
+            async with httpx.AsyncClient(timeout=20) as c:
+                return await test(c, secret)
+        res = asyncio.run(run())
+        print(f"Gelukt: oefenaccount met {eur(res.value)} in {len(res.positions)} posities")
+    except Exception as e:
+        print("Mislukt:", describe(e))
+        return
+    s.set_secret(sid, secret)
+    print("Opgeslagen (versleuteld). Je kunt nu vanuit de app handelen met oefengeld.")
+
+
+def cmd_trade(args: list[str]) -> None:
+    from . import trading
+
+    s = Store()
+    if args[:1] == ["maximum"]:
+        try:
+            value = parse_amount(args[1])
+        except (IndexError, ValueError):
+            print("Gebruik: python -m meridian handel maximum 250")
+            return
+        if value < 0:
+            print("Het maximum kan niet negatief zijn.")
+            return
+        s.set_setting("trade.daymax", value)
+        print(f"Dagmaximum ingesteld op {eur(value)}.")
+        return
+    print("Handelen (alleen oefengeld in deze versie)\n")
+    for broker, ok in trading.connected(s).items():
+        print(f"  {'✓' if ok else '·'} {trading.NAMES[broker]:<12} {'handelssleutel (demo)' if ok else 'geen handelssleutel'}")
+    print(f"\n  Dagmaximum: {eur(trading.day_max(s))} · vandaag gebruikt: {eur(trading.used_today(s))}\n")
+    rows = s.orders_log(20)
+    if not rows:
+        print("Nog geen orders.")
+    for r in rows:
+        when = datetime.fromtimestamp(r["ts"]).strftime("%d-%m %H:%M")
+        amount = eur(r["amount"]) if r["amount"] else ""
+        mark = "✓" if r["ok"] else "✗"
+        print(f"  {mark} {when}  {r['action']:<9} {r['symbol'][:16]:<16} {amount:>12}  {r['message'] or ''}")
 
 
 def cmd_manual() -> None:
@@ -219,7 +295,7 @@ def cmd_devices(remove: bool = False) -> None:
             c.execute("DELETE FROM devices")
         print("Alle telefoons ontkoppeld. Koppel opnieuw met een koppelcode.")
         return
-    rows = list(s._conn.execute("SELECT name, created, last_seen FROM devices ORDER BY created"))
+    rows = s._all("SELECT name, created, last_seen FROM devices ORDER BY created")
     if not rows:
         print("Nog geen telefoon gekoppeld.")
     for name, created, seen in rows:
@@ -241,6 +317,8 @@ def main(argv: list[str]) -> None:
         cmd_manual()
     elif cmd == "status":
         cmd_status()
+    elif cmd == "handel":
+        cmd_trade(args)
     elif cmd == "apparaten":
         cmd_devices()
     elif cmd == "ontkoppel":

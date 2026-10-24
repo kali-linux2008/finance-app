@@ -3,9 +3,10 @@
 Persoonlijk vermogens- en beleggingsdashboard voor Android (Nederlands, EUR). Bundelt Trading 212, OKX, Trezor Safe 5, ING en handmatige bezittingen (goud, pensioen, woning) in één overzicht, met handelen via Trading 212 en OKX.
 
 ## Status
-Stap 1–4 gebouwd:
-- de Expo-app in `app/`: thema, Overzicht, Portefeuille, Detail en het vergrendelscherm met pincode en vingerafdruk;
-- de server in `server/` (Python/FastAPI): haalt je echte saldi op bij Trading 212, OKX en je Trezor, plus handmatige bezittingen zoals Rabobank, goud, pensioen en woning. Alleen-lezen.
+Stap 1–5 gebouwd:
+- de Expo-app in `app/`: thema, Overzicht, Portefeuille, Detail, het vergrendelscherm met pincode en vingerafdruk, het handelsvenster en Lopende orders;
+- de server in `server/` (Python/FastAPI): haalt je echte saldi op bij Trading 212, OKX en je Trezor, plus handmatige bezittingen zoals Rabobank, goud, pensioen en woning (alleen-lezen);
+- handelen via Trading 212 en OKX, **alleen met oefengeld** (demo), met aparte handelssleutels, een dagmaximum en een orderlogboek.
 
 Zonder gekoppelde server toont de app voorbeelddata.
 
@@ -36,4 +37,4 @@ docs/
 - De `.dc.html`-bestanden werken als je ze via een lokale webserver opent (bijv. `npx serve design`), omdat ze `support.js` en `android-frame.jsx` laden.
 
 ## Volgende stap
-Stap 5 uit `docs/ADVIES-STACK.md`: handelen via OKX en Trading 212, eerst op de demo-omgevingen.
+Stap 6 uit `docs/ADVIES-STACK.md`: koersalerts, meldingen, periodiek inleggen en herbalanceren.
