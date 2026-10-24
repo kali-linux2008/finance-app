@@ -15,12 +15,19 @@ import httpx
 from .. import config, prices
 from ..models import Position, SourceResult
 
+# OKX heeft per regio een eigen omgeving; een sleutel werkt alleen in de omgeving waar hij gemaakt is.
+# Nederland/EU = OKX Europe (eea.okx.com). Zie https://www.okx.com/en-eu/help/api-faq-eea
+DOMAINS = ["https://eea.okx.com", "https://www.okx.com", "https://my.okx.com"]
+WRONG_REGION = "50119"
+
 NAMES = {"BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana", "USDT": "Tether", "USDC": "USD Coin", "EUR": "Euro"}
 MIN_VALUE = 1.0  # stof onder € 1 laten we weg
 
 
 class OkxError(Exception):
-    pass
+    def __init__(self, message: str, code: str | None = None):
+        super().__init__(message)
+        self.code = code
 
 
 def sign(secret: str, ts: str, method: str, path: str, body: str = "") -> str:
@@ -45,11 +52,28 @@ async def _get(client: httpx.AsyncClient, secret: dict, path: str, params: dict 
     }
     if secret.get("demo"):
         headers["x-simulated-trading"] = "1"
-    r = await client.get(config.OKX_URL + path, headers=headers)
+    r = await client.get(secret.get("domain", config.OKX_URL) + path, headers=headers)
     body = r.json()
     if body.get("code") != "0":
-        raise OkxError(f"OKX: {body.get('msg') or 'onbekende fout'} (code {body.get('code')})")
+        code = str(body.get("code"))
+        hint = " Je sleutel hoort bij een andere OKX-regio; voeg de bron opnieuw toe." if code == WRONG_REGION else ""
+        raise OkxError(f"OKX: {body.get('msg') or 'onbekende fout'} (code {code}).{hint}", code)
     return body.get("data") or []
+
+
+async def find_domain(client: httpx.AsyncClient, secret: dict) -> str:
+    """Probeert de OKX-regio's tot de sleutel herkend wordt; geeft het werkende adres terug."""
+    last: OkxError | None = None
+    for domain in DOMAINS:
+        try:
+            await _get(client, {**secret, "domain": domain}, "/api/v5/account/balance")
+            return domain
+        except OkxError as e:
+            if e.code != WRONG_REGION:
+                raise  # sleutel bestaat hier wel, maar er is iets anders mis (bijv. passphrase)
+            last = e
+    raise OkxError("OKX kent deze API-sleutel in geen enkele regio (code 50119). Klopt de sleutel? "
+                   "Maakte je hem in de demo-omgeving, voeg dan --demo toe.", WRONG_REGION) from last
 
 
 async def balances(client: httpx.AsyncClient, secret: dict) -> dict[str, float]:

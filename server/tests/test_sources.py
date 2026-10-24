@@ -161,3 +161,32 @@ async def test_price_service_down_gives_warning_not_crash():
         assert res.positions[0].value == pytest.approx(22 * 88.64)
         res2 = await manual.gold_source(c, manual.normalize({"gold_grams": 22}))
         assert not res2.positions and res2.warnings
+
+
+@respx.mock
+async def test_okx_finds_eea_region_for_dutch_accounts():
+    wrong = {"code": "50119", "msg": "API key doesn't exist", "data": []}
+    respx.get("https://eea.okx.com/api/v5/account/balance").respond(json={"code": "0", "data": [{"details": []}]})
+    respx.get("https://www.okx.com/api/v5/account/balance").respond(json=wrong)
+    async with httpx.AsyncClient() as c:
+        assert await okx.find_domain(c, {"key": "k", "secret": "s", "passphrase": "p"}) == "https://eea.okx.com"
+
+
+@respx.mock
+async def test_okx_region_search_stops_on_other_errors_and_uses_saved_domain():
+    respx.get("https://eea.okx.com/api/v5/account/balance").respond(json={"code": "50105", "msg": "Invalid OK-ACCESS-PASSPHRASE", "data": []})
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(okx.OkxError, match="PASSPHRASE"):
+            await okx.find_domain(c, {"key": "k", "secret": "s", "passphrase": "fout"})
+
+    for d in okx.DOMAINS:
+        respx.get(f"{d}/api/v5/account/balance").respond(json={"code": "50119", "msg": "API key doesn't exist", "data": []})
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(okx.OkxError, match="geen enkele regio"):
+            await okx.find_domain(c, {"key": "k", "secret": "s", "passphrase": "p"})
+
+    route = respx.get("https://eea.okx.com/api/v5/asset/balances").respond(json={"code": "0", "data": []})
+    respx.get("https://eea.okx.com/api/v5/account/balance").respond(json={"code": "0", "data": [{"details": []}]})
+    async with httpx.AsyncClient() as c:
+        res = await okx.fetch(c, {"key": "k", "secret": "s", "passphrase": "p", "domain": "https://eea.okx.com"})
+    assert route.called and res.positions == []

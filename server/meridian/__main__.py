@@ -107,6 +107,16 @@ def cmd_source(args: list[str]) -> None:
         print("OKX → Profiel → API: maak een sleutel met alleen 'Lezen'. Nooit 'Opnemen'.")
         secret = {"key": ask("API-sleutel", secret=True), "secret": ask("Secret", secret=True),
                   "passphrase": ask("Passphrase", secret=True), "demo": demo}
+        print("OKX-regio zoeken…")
+        try:
+            async def detect() -> str:
+                async with httpx.AsyncClient(timeout=20) as c:
+                    return await okx.find_domain(c, secret)
+            secret["domain"] = asyncio.run(detect())
+            print(f"Gevonden: {secret['domain']}")
+        except Exception as e:
+            print("Mislukt:", e)
+            return
     elif sid == "trezor":
         print("Trezor Suite → je Bitcoin-account → Details → Toon publieke sleutel.")
         secret = {"xpub": ask("Publieke sleutel (zpub/xpub of descriptor)"), "label": ask("Naam", "Trezor Safe 5")}
