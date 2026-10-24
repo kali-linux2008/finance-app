@@ -191,6 +191,9 @@ def add_trade_key(s: Store, sid: str) -> None:
         print(f"Gelukt: oefenaccount met {eur(res.value)} in {len(res.positions)} posities")
     except Exception as e:
         print("Mislukt:", describe(e))
+        if sid == "t212.handel" and "401" in str(e):
+            print("Tip: maak de sleutel aan terwijl je in je oefenaccount (Practice) zit; een sleutel van je echte "
+                  "account werkt hier niet. Plak sleutel en geheim elk apart en typ één opdracht tegelijk.")
         return
     s.set_secret(sid, secret)
     print("Opgeslagen (versleuteld). Je kunt nu vanuit de app handelen met oefengeld.")

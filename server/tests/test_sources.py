@@ -193,6 +193,22 @@ async def test_okx_region_search_stops_on_other_errors_and_uses_saved_domain():
 
 
 @respx.mock
+async def test_okx_demo_key_tries_all_regions_and_explains_wrong_environment():
+    env = {"code": "50101", "msg": "APIKey does not match current environment.", "data": []}
+    respx.get("https://eea.okx.com/api/v5/account/balance").respond(json=env)
+    ok = respx.get("https://www.okx.com/api/v5/account/balance").respond(json={"code": "0", "data": [{"details": []}]})
+    async with httpx.AsyncClient() as c:
+        assert await okx.find_domain(c, {"key": "k", "secret": "s", "passphrase": "p", "demo": True}) == "https://www.okx.com"
+    assert ok.calls[0].request.headers["x-simulated-trading"] == "1"
+
+    for d in okx.DOMAINS:
+        respx.get(f"{d}/api/v5/account/balance").respond(json=env)
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(okx.OkxError, match="echte account.*Demo trading"):
+            await okx.find_domain(c, {"key": "k", "secret": "s", "passphrase": "p", "demo": True})
+
+
+@respx.mock
 async def test_trezor_network_errors_have_a_readable_message():
     respx.get(url__startswith="https://mempool.space/api/address/").mock(side_effect=httpx.ConnectError(""))
     respx.get(url__startswith="https://blockstream.info/api/address/").mock(side_effect=httpx.ReadTimeout(""))

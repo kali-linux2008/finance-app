@@ -20,6 +20,7 @@ from ..models import Position, SourceResult
 # Nederland/EU = OKX Europe (eea.okx.com). Zie https://www.okx.com/en-eu/help/api-faq-eea
 DOMAINS = ["https://eea.okx.com", "https://www.okx.com", "https://my.okx.com"]
 WRONG_REGION = "50119"
+WRONG_ENV = "50101"  # demo-sleutel in de echte omgeving of andersom (of een andere regio)
 
 NAMES = {"BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana", "USDT": "Tether", "USDC": "USD Coin", "EUR": "Euro"}
 MIN_VALUE = 1.0  # stof onder € 1 laten we weg
@@ -80,9 +81,14 @@ async def find_domain(client: httpx.AsyncClient, secret: dict) -> str:
             await _get(client, {**secret, "domain": domain}, "/api/v5/account/balance")
             return domain
         except OkxError as e:
-            if e.code != WRONG_REGION:
+            if e.code not in (WRONG_REGION, WRONG_ENV):
                 raise  # sleutel bestaat hier wel, maar er is iets anders mis (bijv. passphrase)
             last = e
+    if last and last.code == WRONG_ENV:
+        hint = ("Dit is waarschijnlijk een sleutel van je echte account. Maak de sleutel in Demo trading "
+                "(Trade → Demo trading, daarna Profiel → Demo trading API)." if secret.get("demo") else
+                "Dit is waarschijnlijk een demo-sleutel. Voeg hem toe met --demo, of maak een sleutel in je echte account.")
+        raise OkxError(f"OKX: de sleutel past niet bij deze omgeving (code 50101). {hint}", WRONG_ENV) from last
     raise OkxError("OKX kent deze API-sleutel in geen enkele regio (code 50119). Klopt de sleutel? "
                    "Maakte je hem in de demo-omgeving, voeg dan --demo toe.", WRONG_REGION) from last
 
