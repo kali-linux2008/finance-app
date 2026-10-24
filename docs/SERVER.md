@@ -108,7 +108,7 @@ docker compose exec meridian python -m meridian bron okx
 docker compose exec meridian python -m meridian bron trezor
 ```
 
-> Privacy: om je saldo te bepalen vraagt de server de adressen op bij mempool.space. Die dienst kan dan zien welke adressen bij elkaar horen. Draai je later een eigen Bitcoin-node met mempool, zet dan `MERIDIAN_ESPLORA_URL` in `.env` (zie `.env.example`).
+> Privacy: om je saldo te bepalen vraagt de server de adressen op bij mempool.space (en als die te traag is bij blockstream.info). Die dienst kan dan zien welke adressen bij elkaar horen. Draai je later een eigen Bitcoin-node met mempool, zet dan `MERIDIAN_ESPLORA_URL` in `.env` (zie `.env.example`).
 
 ### Rabobank, goud, pensioen en woning (handmatig)
 ```bash
