@@ -44,3 +44,18 @@ def test_cli_strips_arrow_key_codes():
 
     assert clean("Rabobank Betaalrekening\x1b[D\x1b[D ") == "Rabobank Betaalrekening"
     assert parse_amount(clean("1645,98\x1b[C")) == 1645.98
+
+
+def test_success_line_keeps_source_name(capsys, monkeypatch):
+    import asyncio
+
+    from meridian import __main__ as cli
+    from meridian.models import SourceResult
+
+    async def fake(client, secret):
+        return SourceResult(id="okx", name="OKX")
+
+    monkeypatch.setitem(cli.okx.__dict__, "fetch", fake)
+    asyncio.run(cli._test("okx", {}))
+    assert "Gelukt: OKX · € 0,00 in 0 posities" in capsys.readouterr().out
+    assert cli.eur(1438.92) == "€ 1.438,92"
