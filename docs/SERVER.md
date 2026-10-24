@@ -213,6 +213,8 @@ Elke maand op een vaste dag dezelfde bedragen kopen bij Trading 212, zoals een s
 
 De server koopt op de inlegdag rond 15:45, als de Europese en Amerikaanse beurzen allebei open zijn. Valt de dag in het weekend, dan de eerstvolgende werkdag. Staat er te weinig vrij saldo, dan koopt hij niets en probeert hij het de volgende werkdag opnieuw. Elke maand wordt maar één keer gekocht. De inleg telt niet mee voor het dagmaximum.
 
+Na elke inleg krijg je een pushmelding, als je de eigen Meridian-app gebruikt en meldingen aan hebt staan (zie [MELDINGEN.md](MELDINGEN.md)). Testen: `docker compose exec meridian python -m meridian melding test`.
+
 Lopende limietorders zie je in de app onder **Portefeuille → Orders**. Daar kun je de limiet wijzigen of de order annuleren.
 
 ## Bijwerken

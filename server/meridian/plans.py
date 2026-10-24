@@ -18,7 +18,7 @@ from datetime import time as clock
 
 import httpx
 
-from . import config, trading
+from . import config, notify, trading
 from .store import Store
 
 log = logging.getLogger("meridian.plan")
@@ -122,7 +122,7 @@ async def run(store: Store, client: httpx.AsyncClient, now: datetime, sleep=asyn
 
     if total(plan) > month_max(store) + 0.005:
         report["message"] = f"Niet uitgevoerd: plan is hoger dan het maandmaximum ({trading._eur(month_max(store))})."
-        return _save_report(store, report)
+        return await _finish(store, client, report)
 
     # Eerst kijken of er genoeg vrij saldo is; liever niets kopen dan half.
     try:
@@ -131,10 +131,10 @@ async def run(store: Store, client: httpx.AsyncClient, now: datetime, sleep=asyn
         _, cash = await trading._t212_account(client, secret, "")
         if cash + 0.005 < need:
             report["message"] = f"Niet uitgevoerd: {trading._eur(cash)} vrij, {trading._eur(need)} nodig. Morgen opnieuw."
-            return _save_report(store, report)
+            return await _finish(store, client, report)
     except Exception as e:  # noqa: BLE001 - een melding is beter dan een vastgelopen planner
         report["message"] = f"Niet uitgevoerd: {trading._describe(e)}"
-        return _save_report(store, report)
+        return await _finish(store, client, report)
 
     for i, line in enumerate(plan["lines"]):
         if i:
@@ -150,7 +150,15 @@ async def run(store: Store, client: httpx.AsyncClient, now: datetime, sleep=asyn
     failed = [r["tk"] or r["posId"] for r in report["lines"] if not r["ok"]]
     report["message"] = "Alles gekocht." if not failed else f"Niet gelukt: {', '.join(failed)}. Zie de details."
     store.set_setting("plan.done", report["month"])  # deze maand is klaar; mislukte regels koop je zelf bij
-    return _save_report(store, report)
+    return await _finish(store, client, report)
+
+
+async def _finish(store: Store, client: httpx.AsyncClient, report: dict) -> dict:
+    _save_report(store, report)
+    title = "Inleg gelukt" if report["ok"] else "Inleg niet (helemaal) gelukt"
+    body = f"{trading._eur(report['total'])} belegd." if report["ok"] else report["message"]
+    await notify.send(store, client, title, body, {"screen": "periodiek"})
+    return report
 
 
 def _save_report(store: Store, report: dict) -> dict:

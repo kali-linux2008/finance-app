@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, auth, config, plans, portfolio, prices, trading
+from . import __version__, auth, config, notify, plans, portfolio, prices, trading
 from .store import Store
 
 state: dict = {}
@@ -210,3 +210,25 @@ async def put_plan(body: PlanBody, s: Store = Depends(store), c: httpx.AsyncClie
         raise _trade_error(e) from e
     s.set_setting("plan", plan)
     return _plan_state(s)
+
+
+# Pushmeldingen: de app geeft het adres (Expo push-token) van de telefoon door.
+
+class PushBody(BaseModel):
+    token: str
+    device: str = "telefoon"
+
+
+@app.post("/api/push", dependencies=[Depends(device)])
+def push_on(body: PushBody, s: Store = Depends(store)) -> dict:
+    try:
+        notify.add_token(s, body.token, body.device)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True}
+
+
+@app.post("/api/push/uit", dependencies=[Depends(device)])
+def push_off(body: PushBody, s: Store = Depends(store)) -> dict:
+    notify.remove_token(s, body.token)
+    return {"ok": True}
