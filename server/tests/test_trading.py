@@ -28,6 +28,7 @@ def setup(monkeypatch, store):
         return {"positions": POSITIONS}
     monkeypatch.setattr(portfolio, "build", build)
     trading._pairs.clear()
+    trading._accounts.clear()
     import time as _t
     meta = {"VWCEd_EQ": {"ticker": "VWCEd_EQ", "minTradeQuantity": 0.01}, "AAPL_US_EQ": {"ticker": "AAPL_US_EQ", "minTradeQuantity": 0.01}}
     for base in (trading212.DEMO, trading212.LIVE):

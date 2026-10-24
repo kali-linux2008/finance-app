@@ -128,9 +128,18 @@ def _t212(secret: dict) -> tuple[str, dict]:
     return base, trading212.auth_header(secret["key"], secret.get("secret"))
 
 
+# Kort onthouden: het handelsvenster vraagt dit op, en de order een paar tellen later weer.
+# Trading 212 staat maar weinig verzoeken per sleutel toe (en de leesbron gebruikt soms dezelfde sleutel).
+ACCOUNT_TTL = 10.0
+_accounts: dict[tuple[str, str, str], tuple[float, float, float]] = {}
+
+
 async def _t212_account(client: httpx.AsyncClient, secret: dict, symbol: str) -> tuple[float, float]:
     """(stuks van dit instrument, vrij saldo in euro) op het handelsaccount."""
     base, headers = _t212(secret)
+    key = (base, secret["key"], symbol)
+    if (hit := _accounts.get(key)) and time.time() - hit[0] < ACCOUNT_TTL:
+        return hit[1], hit[2]
     try:
         rows = await trading212.request(client, base, "GET", "/equity/positions", headers)
         qty = sum(float(r.get("quantity") or 0) for r in rows if (r.get("instrument") or {}).get("ticker") == symbol)
@@ -143,6 +152,7 @@ async def _t212_account(client: httpx.AsyncClient, secret: dict, symbol: str) ->
     except trading212.T212NotFound:
         c = await trading212.request(client, base, "GET", "/equity/account/cash", headers)
         cash = float(c.get("free") or 0)
+    _accounts[key] = (time.time(), qty, cash)
     return qty, cash
 
 
@@ -360,6 +370,7 @@ async def _place_t212(client: httpx.AsyncClient, secret: dict, prod: Product, re
                          f"ongeveer {_eur(min_qty * per_unit * 1.01)}.")
     limit = prod.price * factor if req.type == "limiet" else None
     res = await _t212_place(client, secret, prod.symbol, qty, limit)
+    _accounts.clear()  # saldo en positie zijn nu veranderd
     return {**res, "limit": limit}
 
 

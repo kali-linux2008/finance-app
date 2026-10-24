@@ -245,3 +245,18 @@ async def test_trezor_skips_slow_service_quickly_and_remembers_the_fast_one():
         assert slow.call_count == 1  # één keer proberen, niet twee keer wachten
         await trezor._address_info(c, "bc1qbbb")
     assert slow.call_count == 1 and fast.call_count == 2  # tweede adres meteen bij de snelle dienst
+
+
+@respx.mock
+async def test_t212_waits_and_retries_on_rate_limit(monkeypatch):
+    waits = []
+
+    async def fake_sleep(s):
+        waits.append(s)
+
+    monkeypatch.setattr(trading212, "_sleep", fake_sleep)
+    route = respx.get(f"{T212}/equity/account/summary").mock(side_effect=[
+        httpx.Response(429, headers={"retry-after": "3"}), httpx.Response(429), httpx.Response(200, json={"cash": {}})])
+    async with httpx.AsyncClient() as c:
+        assert await trading212.request(c, T212, "GET", "/equity/account/summary", {}) == {"cash": {}}
+    assert route.call_count == 3 and waits == [3.0, 2.0]

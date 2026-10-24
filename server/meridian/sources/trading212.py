@@ -4,6 +4,7 @@ Sleutels maak je in de app: Instellingen → API. Geef alleen leesrechten
 (account, portefeuille, metadata). Demo en echt geld hebben elk eigen sleutels.
 """
 
+import asyncio
 import base64
 import re
 import time
@@ -41,9 +42,30 @@ def short_ticker(t212_ticker: str) -> str:
     return re.sub(r"[a-z]+$", "", base) or base
 
 
+RATE_RETRIES = 3
+_sleep = asyncio.sleep  # te vervangen in tests
+
+
+def _wait_for(r: httpx.Response) -> float:
+    """Hoe lang wachten na een 429: Trading 212 zegt in x-ratelimit-reset wanneer het weer mag."""
+    try:
+        if reset := r.headers.get("x-ratelimit-reset"):
+            return min(max(float(reset) - time.time(), 1.0), 8.0)
+        if after := r.headers.get("retry-after"):
+            return min(max(float(after), 1.0), 8.0)
+    except ValueError:
+        pass
+    return 2.0
+
+
 async def request(client: httpx.AsyncClient, base: str, method: str, path: str, headers: dict,
                   body: dict | None = None) -> object:
-    r = await client.request(method, base + path, headers=headers, json=body)
+    # Bij 429 is het verzoek niet uitgevoerd (ook geen order), dus opnieuw proberen is veilig.
+    for attempt in range(RATE_RETRIES + 1):
+        r = await client.request(method, base + path, headers=headers, json=body)
+        if r.status_code != 429 or attempt == RATE_RETRIES:
+            break
+        await _sleep(_wait_for(r))
     if r.status_code == 401:
         raise T212Error("Trading 212 weigert de sleutel (401). Klopt de sleutel en het geheim?")
     if r.status_code == 403:
