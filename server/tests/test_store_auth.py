@@ -37,3 +37,10 @@ def test_pair_code_dies_after_too_many_wrong_attempts(store):
     for _ in range(auth.MAX_ATTEMPTS):
         auth.redeem_pair_code(store, wrong, "x")
     assert auth.redeem_pair_code(store, code, "x") is None
+
+
+def test_cli_strips_arrow_key_codes():
+    from meridian.__main__ import clean, parse_amount
+
+    assert clean("Rabobank Betaalrekening\x1b[D\x1b[D ") == "Rabobank Betaalrekening"
+    assert parse_amount(clean("1645,98\x1b[C")) == 1645.98
