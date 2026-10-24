@@ -65,6 +65,11 @@ def ask_number(prompt: str, default: float | None = None) -> float | None:
             print("  Vul een getal in, bijv. 12400 of 12.400,50")
 
 
+def eur(v: float) -> str:
+    """€ 1.438,92 (alleen het bedrag omzetten, niet de rest van de zin)."""
+    return "€ " + f"{v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def describe(e: Exception) -> str:
     """Foutmelding die nooit leeg is (netwerkfouten van httpx hebben vaak geen tekst)."""
     text = str(e).strip()
@@ -90,7 +95,7 @@ async def _test(sid: str, secret: dict) -> None:
     fetch = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch}[sid]
     async with httpx.AsyncClient(timeout=20) as c:
         res = await fetch(c, secret)
-    print(f"Gelukt: {res.name} · € {res.value:,.2f} in {len(res.positions)} posities".replace(",", "X").replace(".", ",").replace("X", "."))
+    print(f"Gelukt: {res.name} · {eur(res.value)} in {len(res.positions)} posities")
     for w in res.warnings:
         print("  Let op:", w)
 
@@ -196,7 +201,6 @@ def cmd_status() -> None:
             return await portfolio.build(Store(), c, force=True)
 
     p = asyncio.run(run())
-    eur = lambda v: f"€ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
     print(f"Belegd vermogen: {eur(p['total'])}\n")
     for src in p["sources"]:
         mark = {"ok": "✓", "oud": "~", "fout": "✗"}[src["status"]]
