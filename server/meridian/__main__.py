@@ -331,13 +331,14 @@ def cmd_status() -> None:
 
     async def run() -> dict:
         async with httpx.AsyncClient(timeout=20) as c:
-            return await portfolio.build(Store(), c, force=True)
+            return await portfolio.build(Store(), c, force=True, wait=None)
 
     p = asyncio.run(run())
     print(f"Belegd vermogen: {eur(p['total'])}\n")
     for src in p["sources"]:
         mark = {"ok": "✓", "oud": "~", "fout": "✗"}[src["status"]]
-        print(f" {mark} {src['name']:<24} {eur(src['value']):>14}" + (f"   {src['error']}" if src["error"] else ""))
+        took = f"{src['took']:>6.1f} s" if src.get("took") is not None else " " * 8
+        print(f" {mark} {src['name']:<24} {eur(src['value']):>14} {took}" + (f"   {src['error']}" if src["error"] else ""))
     print()
     for pos in p["positions"]:
         print(f"   {pos['tk']:<6} {pos['name'][:28]:<28} {eur(pos['value']):>14}")

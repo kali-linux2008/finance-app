@@ -89,3 +89,27 @@ async def test_failed_source_shows_last_known_value_even_after_restart(store, fa
     assert tz["status"] == "oud" and tz["value"] == 9870 and "traag" in tz["error"]
     btc = next(x for x in p["positions"] if x["tk"] == "BTC")
     assert btc["value"] == 9870 + 3461
+
+
+async def test_slow_source_does_not_block_the_app(store, fake_sources, monkeypatch):
+    import asyncio
+
+    await portfolio.build(store, client=None)  # laatste standen bewaard
+    portfolio._cache.clear()  # alsof de server herstart
+    calls = 0
+
+    async def slow(client, secret):
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0.3)
+        return SourceResult(id="trezor", name="Trezor Safe 5", positions=[pos(id="trezor-BTC", tk="BTC", name="Bitcoin", src="Trezor Safe 5", value=9999, qty=0.11, unit="BTC")])
+
+    monkeypatch.setitem(portfolio.FETCHERS, "trezor", slow)
+    p = await portfolio.build(store, client=None, wait=0.05)
+    tz = next(s for s in p["sources"] if s["id"] == "trezor")
+    assert tz["status"] == "oud" and tz["value"] == 9870 and "nog opgehaald" in tz["error"]  # meteen antwoord
+    await portfolio.build(store, client=None, wait=0.05)  # tweede verzoek start hem niet opnieuw
+    await asyncio.sleep(0.4)
+    p = await portfolio.build(store, client=None, wait=0.05)
+    tz = next(s for s in p["sources"] if s["id"] == "trezor")
+    assert tz["status"] == "ok" and tz["value"] == 9999 and tz["took"] is not None and calls == 1

@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 
 import httpx
@@ -16,6 +16,10 @@ FETCHERS = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch}
 TTL = {"t212": 60, "okx": 60, "trezor": 300}
 ORDER = ["t212", "bank", "trezor", "okx", "manual"]
 NAMES = {"t212": "Trading 212", "okx": "OKX", "trezor": "Trezor"}
+# Zo lang wacht de app op een bron. Is hij trager, dan krijgt de app de laatst bekende stand
+# en haalt de server de bron op de achtergrond verder op (de app wacht zelf maximaal 30 s).
+WAIT = 12.0
+SLOW = "Wordt nog opgehaald; je ziet de laatst bekende stand."
 
 
 @dataclass
@@ -23,7 +27,13 @@ class Cached:
     result: SourceResult | None = None
     at: float = 0
     error: str | None = None
-    lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    task: asyncio.Task | None = None
+    took: float | None = None  # duur van de laatste keer ophalen, in seconden
+    restored: bool = False  # result komt uit de opgeslagen laatste stand
+
+    @property
+    def busy(self) -> bool:
+        return self.task is not None and not self.task.done()
 
 
 _cache: dict[str, Cached] = {}
@@ -42,21 +52,33 @@ def _from_json(d: dict) -> SourceResult:
     return SourceResult(id=d["id"], name=d["name"], positions=positions, change=d.get("change"), sub=d.get("sub"))
 
 
-async def _source(client: httpx.AsyncClient, store: Store, sid: str, force: bool) -> Cached:
+async def _refresh(client: httpx.AsyncClient, store: Store, sid: str, c: Cached) -> None:
+    start = time.monotonic()
+    try:
+        c.result = await FETCHERS[sid](client, store.get_secret(sid) or {})
+        c.at, c.error, c.restored = time.time(), None, False
+        # Laatst bekende stand bewaren, zodat een storing na een herstart niet als € 0 telt.
+        store.set_setting(f"last.{sid}", {"at": c.at, "result": _to_json(c.result)})
+    except Exception as e:  # één kapotte bron mag de rest niet tegenhouden
+        c.error = str(e).strip() or f"Geen verbinding ({e.__class__.__name__})"
+    finally:
+        c.took = round(time.monotonic() - start, 1)
+
+
+async def _source(client: httpx.AsyncClient, store: Store, sid: str, force: bool, wait: float | None = WAIT) -> Cached:
     c = _cache.setdefault(sid, Cached())
-    async with c.lock:
-        if not force and c.result and time.time() - c.at < TTL[sid]:
-            return c
-        try:
-            c.result = await FETCHERS[sid](client, store.get_secret(sid) or {})
-            c.at, c.error = time.time(), None
-            # Laatst bekende stand bewaren, zodat een storing na een herstart niet als € 0 telt.
-            store.set_setting(f"last.{sid}", {"at": c.at, "result": _to_json(c.result)})
-        except Exception as e:  # één kapotte bron mag de rest niet tegenhouden
-            c.error = str(e).strip() or f"Geen verbinding ({e.__class__.__name__})"
-            if c.result is None and (last := store.get_setting(f"last.{sid}")):
-                c.result, c.at = _from_json(last["result"]), last["at"]
+    if c.result is None and (last := store.get_setting(f"last.{sid}")):
+        c.result, c.at, c.restored = _from_json(last["result"]), last["at"], True
+    fresh = c.result and not c.error and not c.restored and time.time() - c.at < TTL[sid]
+    if not force and fresh:
         return c
+    if not c.busy:  # nooit twee keer tegelijk dezelfde bron ophalen
+        c.task = asyncio.create_task(_refresh(client, store, sid, c))
+    try:
+        await asyncio.wait_for(asyncio.shield(c.task), wait)
+    except asyncio.TimeoutError:
+        pass  # loopt door op de achtergrond; de app krijgt nu de laatst bekende stand
+    return c
 
 
 def merge_crypto(positions: list[Position]) -> list[Position]:
@@ -93,10 +115,10 @@ def start_of_day(now: float) -> float:
     return d.replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
 
 
-async def build(store: Store, client: httpx.AsyncClient, force: bool = False) -> dict:
+async def build(store: Store, client: httpx.AsyncClient, force: bool = False, wait: float | None = WAIT) -> dict:
     data = manual.normalize(store.get_setting("manual"))
     configured = [s for s in store.sources() if s in FETCHERS]
-    cached = await asyncio.gather(*(_source(client, store, s, force) for s in configured))
+    cached = await asyncio.gather(*(_source(client, store, s, force, wait) for s in configured))
 
     results: list[tuple[SourceResult | None, Cached | None, str]] = [(c.result, c, s) for c, s in zip(cached, configured)]
     bank = manual.bank_source(data)
@@ -113,11 +135,12 @@ async def build(store: Store, client: httpx.AsyncClient, force: bool = False) ->
         if res:
             positions += res.positions
             warnings += res.warnings
-        status = "ok" if not c or not c.error else ("oud" if res else "fout")
+        error = None if not c else SLOW if c.busy else c.error
+        status = "ok" if not error else ("oud" if res else "fout")
         sources.append({
             "id": sid, "name": res.name if res else NAMES.get(sid, sid), "value": round(res.value, 2) if res else 0,
             "change": res.change if res else None, "sub": res.sub if res else None,
-            "status": status, "error": c.error if c else None,
+            "status": status, "error": error, "took": c.took if c else None,
             "syncedAt": c.at if c and c.at else time.time(),
         })
 
