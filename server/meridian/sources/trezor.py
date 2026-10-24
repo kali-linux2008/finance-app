@@ -66,7 +66,15 @@ def address(key: HDKey, kind: str, chain: int, index: int) -> str:
 async def _address_info(client: httpx.AsyncClient, addr: str) -> tuple[int, int]:
     """(aantal transacties, saldo in satoshi incl. onbevestigd)."""
     for attempt in range(3):
-        r = await client.get(f"{config.ESPLORA_URL}/address/{addr}")
+        try:
+            r = await client.get(f"{config.ESPLORA_URL}/address/{addr}", timeout=30)
+        except httpx.TimeoutException:
+            if attempt < 2:
+                await asyncio.sleep(2)
+                continue
+            raise TrezorError(f"Blockchain-dienst ({config.ESPLORA_URL}) reageert te traag. Probeer het zo opnieuw.") from None
+        except httpx.HTTPError as e:
+            raise TrezorError(f"Blockchain-dienst ({config.ESPLORA_URL}) niet bereikbaar: {e.__class__.__name__} {e}".strip()) from e
         if r.status_code == 429:
             await asyncio.sleep(1 + attempt * 2)
             continue
