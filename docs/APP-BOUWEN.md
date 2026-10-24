@@ -83,4 +83,14 @@ Bestaat `/swapfile` al, sla dit dan over (of kijk met `swapon --show`).
 | "No space left on device" | Ruim oude Docker-onderdelen op: `docker system prune` (je Meridian-gegevens blijven, die staan in een volume). |
 | Telefoon kan het bestand niet downloaden | Staat de downloadpagina nog aan? Zelfde wifi of Tailscale aan? Firewall: `sudo ufw allow from 192.168.0.0/16 to any port 8080`. |
 | "App niet geïnstalleerd" bij bijwerken | Verwijder de oude Meridian-app eerst (je moet daarna opnieuw koppelen). |
+| App sluit direct na openen | Bouw opnieuw met de nieuwste versie (`git pull`). Zie je het nog steeds, lees dan de foutmelding uit met `adb logcat -d -b crash` (zie hieronder). |
 | Meldingen komen laat of niet bij een dichte app | Batterijbesparing op Onbeperkt (stap 3.4). Open de app één keer na het installeren. |
+
+## Foutmelding van de app uitlezen (via je server)
+
+Crasht de app, dan staat de reden in het logboek van je telefoon. Dat lees je draadloos uit via de server (Android 11 of nieuwer):
+
+1. Telefoon: Instellingen → Ontwikkelaarsopties → **Draadloze foutopsporing** aan → **Apparaat koppelen met koppelingscode**.
+2. Server: `sudo apt install -y adb`, dan `adb pair <ip>:<poort>` met de code, en `adb connect <ip>:<andere poort>` (staat op het scherm Draadloze foutopsporing).
+3. Open de app (hij crasht) en typ: `adb logcat -d -b crash | tail -80`.
+4. Zet Draadloze foutopsporing daarna weer uit.
