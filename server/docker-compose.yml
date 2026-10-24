@@ -10,27 +10,9 @@ services:
       - meridian-data:/app/data
     environment:
       - TZ=Europe/Amsterdam
-      - MERIDIAN_NTFY_URL=http://ntfy
     env_file:
       - path: .env
         required: false
 
-  # Eigen meldingsdienst: de ntfy-app op je telefoon haalt hier je meldingen op. Geen Google of Expo nodig.
-  # Alleen bereikbaar in je eigen netwerk en via Tailscale; zet poort 8090 nooit open naar internet.
-  ntfy:
-    image: binwiederhier/ntfy
-    container_name: ntfy
-    command: serve
-    restart: unless-stopped
-    ports:
-      - "8090:80"
-    environment:
-      - TZ=Europe/Amsterdam
-      - NTFY_CACHE_FILE=/var/cache/ntfy/cache.db
-      - NTFY_CACHE_DURATION=72h
-    volumes:
-      - ntfy-cache:/var/cache/ntfy
-
 volumes:
   meridian-data:
-  ntfy-cache:

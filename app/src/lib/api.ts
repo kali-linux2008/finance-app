@@ -125,3 +125,9 @@ export const getPlan = (cfg: ServerConfig) => request<PlanState>(`${cfg.url}/api
 export const savePlan = (cfg: ServerConfig, plan: Plan) =>
   request<PlanState>(`${cfg.url}/api/plan`, { ...post(cfg, plan), method: 'PUT' }, 30000);
 
+
+// Meldingen (de app haalt ze zelf op)
+export type ServerEvent = { id: number; at: number; title: string; body: string; kind: 'ok' | 'warning' | 'info' };
+
+export const getEvents = async (cfg: ServerConfig, after = 0) =>
+  (await request<{ events: ServerEvent[] }>(`${cfg.url}/api/meldingen?na=${after}`, auth(cfg), 15000)).events;

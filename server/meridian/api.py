@@ -11,7 +11,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, auth, config, plans, portfolio, prices, trading
+from . import __version__, auth, config, notify, plans, portfolio, prices, trading
 from .store import Store
 
 state: dict = {}
@@ -210,3 +210,10 @@ async def put_plan(body: PlanBody, s: Store = Depends(store), c: httpx.AsyncClie
         raise _trade_error(e) from e
     s.set_setting("plan", plan)
     return _plan_state(s)
+
+
+# Meldingen: de app haalt ze zelf op (op de achtergrond en bij openen).
+
+@app.get("/api/meldingen", dependencies=[Depends(device)])
+def get_events(na: int = 0, s: Store = Depends(store)) -> dict:
+    return {"events": notify.events(s, na)}

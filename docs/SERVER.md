@@ -9,7 +9,7 @@ telefoon (app)  ──►  jouw server  ──►  Trading 212 · OKX · Trezor 
 
 Deze handleiding gaat uit van een **Linux-server** (Ubuntu, Debian of Raspberry Pi OS) met **Docker**. Heb je iets anders, zeg het, dan pas ik de stappen aan.
 
-> **Veilig houden:** zet poort 8000 (en 8090 voor meldingen) **nooit** open naar internet (geen port forwarding op je router). Wil je de app buiten je eigen wifi gebruiken, gebruik dan Tailscale (stap 7).
+> **Veilig houden:** zet poort 8000 **nooit** open naar internet (geen port forwarding op je router). Wil je de app buiten je eigen wifi gebruiken, gebruik dan Tailscale (stap 7).
 
 ---
 
@@ -213,7 +213,7 @@ Elke maand op een vaste dag dezelfde bedragen kopen bij Trading 212, zoals een s
 
 De server koopt op de inlegdag rond 15:45, als de Europese en Amerikaanse beurzen allebei open zijn. Valt de dag in het weekend, dan de eerstvolgende werkdag. Staat er te weinig vrij saldo, dan koopt hij niets en probeert hij het de volgende werkdag opnieuw. Elke maand wordt maar één keer gekocht. De inleg telt niet mee voor het dagmaximum.
 
-Na elke inleg krijg je een melding via je eigen ntfy-server en de ntfy-app (zie [MELDINGEN.md](MELDINGEN.md)). Testen: `docker compose exec meridian python -m meridian melding test`.
+Na elke inleg krijg je een melding in de app (zie [MELDINGEN.md](MELDINGEN.md)). Testen: `docker compose exec meridian python -m meridian melding test`.
 
 Lopende limietorders zie je in de app onder **Portefeuille → Orders**. Daar kun je de limiet wijzigen of de order annuleren.
 
