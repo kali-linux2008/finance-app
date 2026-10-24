@@ -125,9 +125,3 @@ export const getPlan = (cfg: ServerConfig) => request<PlanState>(`${cfg.url}/api
 export const savePlan = (cfg: ServerConfig, plan: Plan) =>
   request<PlanState>(`${cfg.url}/api/plan`, { ...post(cfg, plan), method: 'PUT' }, 30000);
 
-// Pushmeldingen
-export const registerPush = (cfg: ServerConfig, token: string, device: string) =>
-  request<{ ok: boolean }>(`${cfg.url}/api/push`, post(cfg, { token, device }));
-
-export const unregisterPush = (cfg: ServerConfig, token: string) =>
-  request<{ ok: boolean }>(`${cfg.url}/api/push/uit`, post(cfg, { token }));

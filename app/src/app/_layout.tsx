@@ -12,7 +12,6 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Toast } from '../components/Toast';
 import { TradeSheet } from '../components/TradeSheet';
-import { configureNotifications } from '../lib/push';
 import { Loading } from '../screens/Loading';
 import { LockScreen } from '../screens/LockScreen';
 import { AppProvider, useApp } from '../state/app';
@@ -21,7 +20,6 @@ import { LockProvider, useLock } from '../state/lock';
 import { TradeProvider } from '../state/trade';
 
 SplashScreen.preventAutoHideAsync();
-configureNotifications();
 
 export default function RootLayout() {
   const [loaded] = useFonts({

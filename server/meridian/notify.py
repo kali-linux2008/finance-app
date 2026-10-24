@@ -1,57 +1,40 @@
-"""Pushmeldingen naar je telefoon via de push-dienst van Expo (exp.host).
+"""Pushmeldingen via je eigen ntfy-server (draait naast Meridian in docker compose).
 
-De telefoon geeft de server zijn adres (een Expo push-token). De melding gaat dan
-server → Expo → Google (FCM) → telefoon. Er gaat alleen een korte tekst mee, geen sleutels.
+De ntfy-app op je telefoon houdt verbinding met jouw server en toont de meldingen.
+Alles blijft in je eigen netwerk (thuis of via Tailscale): geen Google, geen Expo.
+Het onderwerp ("topic") is een lange willekeurige naam; wie die niet kent, ziet niets.
 """
 
 import logging
-import re
-import time
+import secrets
 
 import httpx
 
+from . import config
 from .store import Store
 
 log = logging.getLogger("meridian.notify")
 
-PUSH_URL = "https://exp.host/--/api/v2/push/send"
-TOKEN = re.compile(r"^(Exponent|Expo)PushToken\[[A-Za-z0-9_-]+\]$")
+
+def topic(store: Store, new: bool = False) -> str:
+    """Geheime onderwerpnaam voor je meldingen; wordt één keer aangemaakt en bewaard."""
+    current = store.get_setting("push.topic")
+    if current and not new:
+        return current
+    name = "meridian-" + secrets.token_urlsafe(18)
+    store.set_setting("push.topic", name)
+    return name
 
 
-def tokens(store: Store) -> list[dict]:
-    return store.get_setting("push.tokens") or []
-
-
-def add_token(store: Store, token: str, device: str) -> None:
-    if not TOKEN.match(token):
-        raise ValueError("Ongeldig meldingsadres")
-    rest = [t for t in tokens(store) if t["token"] != token]
-    store.set_setting("push.tokens", rest + [{"token": token, "device": device[:60] or "telefoon", "at": time.time()}])
-
-
-def remove_token(store: Store, token: str) -> None:
-    store.set_setting("push.tokens", [t for t in tokens(store) if t["token"] != token])
-
-
-async def send(store: Store, client: httpx.AsyncClient, title: str, body: str, data: dict | None = None) -> int:
-    """Stuurt een melding naar alle gekoppelde telefoons. Geeft het aantal geslaagde terug; gooit nooit."""
-    targets = tokens(store)
-    if not targets:
-        return 0
-    messages = [{"to": t["token"], "title": title, "body": body, "sound": "default", "channelId": "default",
-                 "data": data or {}} for t in targets]
+async def send(store: Store, client: httpx.AsyncClient, title: str, body: str, tags: list[str] | None = None) -> bool:
+    """Stuurt een melding. Geeft True terug als ntfy hem aannam; gooit nooit."""
+    message = {"topic": topic(store), "title": title, "message": body, "tags": tags or ["moneybag"]}
     try:
-        r = await client.post(PUSH_URL, json=messages, headers={"Accept": "application/json"}, timeout=15)
-        results = r.json().get("data") or []
-    except (httpx.HTTPError, ValueError) as e:
-        log.warning("Melding versturen mislukt: %s", e)
-        return 0
-    ok = 0
-    for target, res in zip(targets, results):
-        if res.get("status") == "ok":
-            ok += 1
-        elif (res.get("details") or {}).get("error") == "DeviceNotRegistered":
-            remove_token(store, target["token"])  # app verwijderd of meldingen uitgezet
-        else:
-            log.warning("Melding naar %s mislukt: %s", target["device"], res.get("message"))
-    return ok
+        r = await client.post(config.NTFY_URL, json=message, timeout=10)
+    except httpx.HTTPError as e:
+        log.warning("Melding versturen mislukt (%s): %s", config.NTFY_URL, e.__class__.__name__)
+        return False
+    if r.status_code >= 400:
+        log.warning("Melding versturen mislukt: ntfy gaf %s", r.status_code)
+        return False
+    return True

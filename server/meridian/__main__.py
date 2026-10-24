@@ -35,7 +35,7 @@ HELP = """Meridian-server beheren
   python -m meridian handel echtgeld maximum 25   dagmaximum voor echt geld
   python -m meridian handel periodiek      periodiek inleggen bekijken (aan / uit / maximum 400)
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
-  python -m meridian melding               telefoons met meldingen tonen (melding test = testmelding)
+  python -m meridian melding               meldingen instellen via je eigen ntfy-server (melding test = testmelding)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -330,27 +330,27 @@ def cmd_plan(s: Store, args: list[str]) -> None:
 
 
 def cmd_notify(args: list[str]) -> None:
-    """Gekoppelde telefoons voor meldingen tonen, of een testmelding sturen."""
+    """Meldingen via je eigen ntfy-server: uitleg tonen, testmelding, of een nieuw geheim onderwerp."""
     from . import notify
 
     s = Store()
-    targets = notify.tokens(s)
     if args[:1] == ["test"]:
-        if not targets:
-            print("Nog geen telefoon met meldingen. Zet ze aan in de Meridian-app: Meer → Meldingen.")
-            return
-
-        async def run() -> int:
+        async def run() -> bool:
             async with httpx.AsyncClient(timeout=20) as c:
-                return await notify.send(s, c, "Meridian", "Testmelding: meldingen werken.")
-        ok = asyncio.run(run())
-        print(f"Testmelding verstuurd naar {ok} van {len(targets)} telefoon(s).")
+                return await notify.send(s, c, "Meridian", "Testmelding: meldingen werken.", ["white_check_mark"])
+        if asyncio.run(run()):
+            print("Testmelding verstuurd. Zie je hem niet? Controleer het onderwerp en het serveradres in de ntfy-app.")
+        else:
+            print(f"Mislukt: ntfy niet bereikbaar op {config.NTFY_URL}. Draait hij? docker compose ps")
         return
-    if not targets:
-        print("Nog geen telefoon met meldingen. Zet ze aan in de Meridian-app: Meer → Meldingen.")
-    for t in targets:
-        print(f"  {t['device']:<24} sinds {datetime.fromtimestamp(t['at']).strftime('%d-%m-%Y')}")
-    print("Testmelding sturen: python -m meridian melding test")
+    name = notify.topic(s, new=args[:1] == ["nieuw"])
+    print("Meldingen via je eigen ntfy-server\n")
+    print("1. Installeer de app 'ntfy' op je telefoon (Play Store of F-Droid).")
+    print("2. In de app: + → 'Use another server' aanvinken en invullen:")
+    print("     Server:    http://<adres-van-je-server>:8090   (bijv. je Tailscale-adres 100.x.y.z)")
+    print(f"     Onderwerp: {name}")
+    print("3. Test: python -m meridian melding test")
+    print("\nHoud het onderwerp geheim. Nieuw onderwerp nodig? python -m meridian melding nieuw")
 
 
 def cmd_manual() -> None:

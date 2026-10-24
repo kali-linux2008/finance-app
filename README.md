@@ -27,7 +27,7 @@ design/
 docs/
   STARTEN.md                          ← de app op je telefoon openen (Node.js, Git, Expo Go)
   SERVER.md                           ← de server installeren en Trading 212, OKX, Trezor koppelen
-  MELDINGEN.md                        ← de eigen Meridian-app bouwen met pushmeldingen
+  MELDINGEN.md                        ← meldingen op je telefoon via je eigen ntfy-server
   ADVIES-STACK.md                     ← waarmee bouwen en in welke volgorde
   tokens.json                         ← alle ontwerpwaarden
   HANDOFF.md                          ← specificatie voor de ontwikkelaar: kleuren, typografie, schermen, gedrag

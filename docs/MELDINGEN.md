@@ -1,98 +1,59 @@
-# De Meridian-app met pushmeldingen
+# Meldingen op je telefoon (helemaal lokaal)
 
-Pushmeldingen (bijv. "Inleg gelukt: € 375 belegd") werken niet in Expo Go: Expo heeft dat op Android uitgezet. Daarom bouw je één keer een eigen Meridian-app (een APK) die je op je telefoon installeert. Dat bouwen gebeurt gratis in de cloud bij Expo; je pc hoeft geen Android-software te hebben.
+Meridian stuurt meldingen via **ntfy**: een kleine meldingsdienst die op je eigen server draait, naast Meridian. Op je telefoon installeer je de gratis **ntfy-app**; die houdt verbinding met jouw server en laat de meldingen zien, ook als Meridian dicht is.
 
-Je hebt nodig: een gratis **Expo-account** en een gratis **Firebase-project** van Google (Firebase bezorgt de meldingen op Android). Reken op een half uur, waarvan een kwartier wachten.
+Geen Google, geen Expo-account, geen cloud: alles blijft in je eigen netwerk (thuis-wifi of Tailscale).
 
-> **Twee bestanden van Firebase, verschillend geheim:**
-> - `google-services.json`: hoort in de app, mag in git.
-> - de **serviceaccount-sleutel** (`...-firebase-adminsdk-....json`): **geheim**. Alleen uploaden naar Expo (stap 4), nooit in git, nooit naar mij sturen.
-
-## 1. Expo-account en de bouwhulp
-
-1. Maak een account op [expo.dev](https://expo.dev/signup).
-2. In PowerShell:
-   ```powershell
-   npm install -g eas-cli
-   eas login
-   ```
-
-## 2. De app koppelen aan je Expo-account
-
-```powershell
-cd $HOME\Documents\finance-app
-git pull
-cd app
-npm install
-eas init
+```
+Meridian-server ──► ntfy (op je server, poort 8090) ──► ntfy-app op je telefoon
 ```
 
-Kies **Create a new project** als hij dat vraagt. `eas init` zet een `projectId` in `app.json`. Zet die wijziging op GitHub:
+Je krijgt bijvoorbeeld een melding na elke periodieke inleg ("Inleg gelukt: € 375,00 belegd" of "Inleg niet gelukt: te weinig saldo").
 
-```powershell
-git add app.json
-git commit -m "Expo-project gekoppeld"
-git push
+> **Veilig houden:** zet poort 8090 net als 8000 **nooit** open naar internet. Gebruik Tailscale als je buiten je wifi bent.
+
+## 1. Server bijwerken (ntfy start dan mee)
+
+```bash
+cd ~/finance-app && git pull
+cd server && docker compose up -d --build
+docker compose ps
 ```
 
-## 3. Firebase-project en google-services.json
+Je ziet nu twee containers: `meridian` en `ntfy`.
 
-1. Ga naar [console.firebase.google.com](https://console.firebase.google.com) → **Project toevoegen** → naam bijv. `meridian` (Google Analytics mag uit).
-2. Klik op het **Android-icoon** om een app toe te voegen. Package name: **`nl.jarno.meridian`** (precies zo). De rest mag leeg.
-3. Download **google-services.json** en zet hem in de map `finance-app\app` (naast `app.json`). De volgende stappen in Firebase (SDK toevoegen) kun je overslaan.
-4. Zet hem op GitHub:
-   ```powershell
-   git add google-services.json
-   git commit -m "Firebase-instellingen voor meldingen"
-   git push
-   ```
+## 2. Je geheime onderwerp opvragen
 
-## 4. Expo toestemming geven om meldingen te sturen
-
-1. In Firebase: tandwiel → **Projectinstellingen** → tab **Serviceaccounts** → **Nieuwe privésleutel genereren**. Je downloadt een JSON-bestand. Dit is de **geheime** sleutel.
-2. In PowerShell (in de map `app`):
-   ```powershell
-   eas credentials -p android
-   ```
-   Kies het profiel **apk** → **Google Service Account** → **Manage your Google Service Account Key for Push Notifications (FCM V1)** → **Set up** / **Upload** → kies het gedownloade bestand.
-3. Verwijder dat bestand daarna uit je Downloads (of bewaar het ergens veilig). Expo heeft het nu.
-
-## 5. De app bouwen
-
-```powershell
-eas build -p android --profile apk
+```bash
+docker compose exec meridian python -m meridian melding
 ```
 
-Vraagt hij om een **keystore** te maken: kies **Yes** (Expo bewaart hem voor je). Het bouwen duurt 10 à 20 minuten. Daarna krijg je een link en een QR-code.
+Je krijgt een onderwerp zoals `meridian-Xk3...`. Dat is een lange geheime naam: wie hem niet kent, ziet je meldingen niet. Deel hem niet.
 
-## 6. Installeren op je telefoon
+## 3. De ntfy-app instellen
 
-1. Open de link (of scan de QR-code) **op je telefoon** en download de APK.
-2. Open het bestand. Android vraagt of je apps uit deze bron wilt toestaan: **Toestaan**, en daarna **Installeren**.
-3. Open **Meridian**. Dit is een nieuwe app naast Expo Go, dus:
-   - kies opnieuw een **pincode**;
-   - koppel opnieuw je server: op de server `docker compose exec meridian python -m meridian koppelcode`, in de app **JV → Server**.
+1. Installeer **ntfy** uit de Play Store (of F-Droid).
+2. Tik op **+** (abonneren).
+3. Vul bij **Topic** je onderwerp uit stap 2 in.
+4. Vink **Use another server** aan en vul in: `http://100.73.31.66:8090` (je Tailscale-adres) of thuis `http://192.168.2.24:8090`. Met het Tailscale-adres werkt het overal, mits Tailscale aan staat op je telefoon.
+5. Tik op **Subscribe**.
 
-## 7. Meldingen aanzetten en testen
+Android vraagt mogelijk of ntfy op de achtergrond mag blijven draaien en meldingen mag tonen: **toestaan**. Zet voor ntfy de batterijbesparing uit (Instellingen → Apps → ntfy → Batterij → Onbeperkt), anders kan Android de verbinding verbreken.
 
-1. In de app: **JV (Meer) → Meldingen** aanzetten en toestemming geven.
-2. Op de server:
-   ```bash
-   docker compose exec meridian python -m meridian melding test
-   ```
-   Binnen een paar seconden krijg je "Testmelding: meldingen werken."
+## 4. Testen
 
-Vanaf nu krijg je na elke periodieke inleg een melding, ook als de app dicht is.
+```bash
+docker compose exec meridian python -m meridian melding test
+```
 
-## Later bijwerken
-
-Na een nieuwe stap bouw je de app opnieuw met `eas build -p android --profile apk` en installeer je de nieuwe APK over de oude heen (je pincode en koppeling blijven bewaard). Voor dagelijks ontwikkelen kun je Expo Go gewoon blijven gebruiken; alleen meldingen werken daar niet.
+Binnen een paar seconden zie je "Testmelding: meldingen werken."
 
 ## Problemen
 
 | Probleem | Oplossing |
 |---|---|
-| "Deze app is nog niet gekoppeld aan Expo" | Stap 2 (`eas init`) is niet gedaan of de wijziging in `app.json` zat niet in de build. |
-| Testmelding verstuurd naar 0 telefoons | De serviceaccount-sleutel is niet (goed) geüpload (stap 4), of `google-services.json` hoort bij een ander Firebase-project. |
-| "Server niet bereikbaar" in de nieuwe app | Zelfde wifi of Tailscale aan? Adres met `:8000` erachter? |
-| Geen melding, wel "verstuurd naar 1" | Android-instellingen → Apps → Meridian → Meldingen aan; batterijbesparing voor Meridian uitzetten. |
+| "Mislukt: ntfy niet bereikbaar" | Draait hij? `docker compose ps`. Zo niet: `docker compose up -d`. |
+| Testmelding verstuurd, maar niets op je telefoon | Onderwerp precies goed overgenomen? Serveradres met `http://` en `:8090`? Tailscale aan op je telefoon? |
+| De ntfy-app kan de server niet bereiken | Staat er een firewall aan op de server? Dan: `sudo ufw allow from 192.168.0.0/16 to any port 8090` en `sudo ufw allow in on tailscale0 to any port 8090`. |
+| Meldingen komen pas laat | Batterijbesparing voor ntfy uitzetten (zie stap 3). |
+| Onderwerp per ongeluk gedeeld | `python -m meridian melding nieuw` geeft een nieuw onderwerp; pas het daarna aan in de ntfy-app. |
