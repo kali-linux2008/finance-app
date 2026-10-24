@@ -16,7 +16,16 @@ CI=1 npx expo prebuild --platform android --clean --no-install
 
 echo "4/4 App bouwen (de eerste keer duurt dit 10–20 minuten)…"
 cd android
-./gradlew assembleRelease --no-daemon --console=plain -Dorg.gradle.jvmargs="-Xmx3g -XX:MaxMetaspaceSize=1g"
+# Zuinig met geheugen, zodat het ook op een server met weinig RAM lukt:
+# - alleen voor moderne telefoons (arm64) bouwen in plaats van vier processortypes;
+# - Kotlin in hetzelfde proces compileren (geen extra Kotlin-daemon);
+# - hooguit $WORKERS taken tegelijk.
+WORKERS="${MERIDIAN_BOUW_WORKERS:-2}"
+./gradlew assembleRelease --no-daemon --console=plain --max-workers="$WORKERS" \
+  -Dorg.gradle.jvmargs="-Xmx${MERIDIAN_BOUW_GEHEUGEN:-2g} -XX:MaxMetaspaceSize=768m -XX:+HeapDumpOnOutOfMemoryError" \
+  -Dorg.gradle.parallel=false \
+  -PreactNativeArchitectures=arm64-v8a \
+  -Pkotlin.compiler.execution.strategy=in-process
 
 cp app/build/outputs/apk/release/app-release.apk /out/meridian.apk
 chmod 644 /out/meridian.apk
