@@ -317,7 +317,7 @@ function Sheet({ target, onClose }: { target: TradeTarget; onClose: () => void }
                 {[
                   ['Order', `${isBuy ? 'Kopen' : 'Verkopen'} · ${type === 'markt' ? 'Markt' : 'Limiet'}`],
                   ['Product', `${pos.tk} via ${quote.brokerName}`],
-                  ['Account', quote.sample ? 'Voorbeeld · er wordt niets verstuurd' : quote.demo ? 'Oefenaccount (demo)' : 'Echt geld'],
+                  ['Account', quote.sample ? 'Voorbeeld · er wordt niets verstuurd' : quote.demo ? 'Oefenaccount (demo)' : 'ECHT GELD'],
                   ['Geschat aantal', `${qtyText(est.qty)} ${quote.unit}`],
                   type === 'limiet' ? ['Limietkoers', fmtPrice(est.limitPrice)] : ['Koers nu', fmtPrice(quote.price)],
                   ['Kosten', euro(est.fee)],
@@ -325,6 +325,11 @@ function Sheet({ target, onClose }: { target: TradeTarget; onClose: () => void }
                 ].map(([key, v]) => <Row key={key} k={key} v={v} />)}
                 <Row k={isBuy ? 'Totaal' : 'Je ontvangt'} v={euro(est.total)} bold />
               </View>
+              {!quote.sample && !quote.demo ? (
+                <View style={{ marginTop: 12, marginHorizontal: 16, paddingVertical: 10, paddingHorizontal: 14, borderRadius: 14, backgroundColor: c.neg }}>
+                  <T size={13} w={700} color="#fff">Let op: dit is een order met echt geld op je {quote.brokerName}-account.</T>
+                </View>
+              ) : null}
               <View style={{ paddingTop: 16, paddingHorizontal: 16 }}>
                 <Pressable onPress={toAuth} style={{ height: 52, borderRadius: 26, backgroundImage: c.btnBg, boxShadow: c.btnShadow, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
                   <Icon name={bio ? 'fingerprint' : 'lock'} size={22} color={c.onAccent} />
@@ -387,7 +392,7 @@ function Sheet({ target, onClose }: { target: TradeTarget; onClose: () => void }
               title={type === 'limiet' ? 'Limietorder geplaatst' : 'Order geplaatst'}
               text={
                 result.res
-                  ? `${isBuy ? 'Kopen' : 'Verkopen'} ${pos.tk} voor € ${amount} op je ${result.res.demo ? 'oefenaccount' : 'account'} bij ${result.res.brokerName}. ` +
+                  ? `${isBuy ? 'Kopen' : 'Verkopen'} ${pos.tk} voor € ${amount} op je ${result.res.demo ? 'oefenaccount' : 'echte account'} bij ${result.res.brokerName}. ` +
                     (type === 'limiet' ? 'Je vindt hem onder Portefeuille → Orders.' : `${quote?.exec}.`)
                   : `Voorbeeld: ${isBuy ? 'kopen' : 'verkopen'} ${pos.tk} voor € ${amount}. Er is niets verstuurd. Koppel je server om met oefengeld te handelen.`
               }
@@ -415,14 +420,15 @@ function Sheet({ target, onClose }: { target: TradeTarget; onClose: () => void }
 
 function DemoBadge({ quote }: { quote: Quote }) {
   const c = useColors();
+  const real = quote.connected && !quote.demo;
   const text = !quote.connected
     ? 'Nog geen handelssleutel op je server'
-    : `${quote.demo ? 'Oefenaccount' : 'Echt geld'} · ${quote.sellQty ? `${qtyText(quote.sellQty)} ${quote.unit} in bezit` : `geen ${quote.tk} in bezit`}` +
+    : `${quote.demo ? 'Oefenaccount' : 'ECHT GELD'} · ${quote.sellQty ? `${qtyText(quote.sellQty)} ${quote.unit} in bezit` : `geen ${quote.tk} in bezit`}` +
       (quote.cash != null ? ` · vrij ${euro(quote.cash)}` : '');
   return (
-    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: c.accentSoft }}>
-      <Icon name="science" size={18} color={c.accent} />
-      <T size={12} w={600} color={c.accent} style={{ flex: 1 }}>{text}</T>
+    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: real ? c.neg : c.accentSoft }}>
+      <Icon name={real ? 'payments' : 'science'} size={18} color={real ? '#fff' : c.accent} />
+      <T size={12} w={real ? 700 : 600} color={real ? '#fff' : c.accent} style={{ flex: 1 }}>{text}</T>
     </View>
   );
 }

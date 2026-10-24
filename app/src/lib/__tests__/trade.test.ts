@@ -52,6 +52,7 @@ describe('estimate', () => {
     expect(estimate(live({ sellMax: 0 }), 'verkopen', 10, 'markt', 0).error).toBe('Je hebt geen VWCE op Trading 212');
     expect(estimate(live({ usedToday: 200 }), 'kopen', 100, 'markt', 0).error).toBe('Dagmaximum: nog € 50,00 vandaag');
     expect(estimate(live(), 'kopen', 100, 'markt', 0).error).toBe('');
+    expect(estimate(live({ demo: false, limitAllowed: false }), 'kopen', 10, 'limiet', -1).error).toBe('Met echt geld kan Trading 212 alleen marktorders');
   });
 });
 

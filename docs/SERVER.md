@@ -181,7 +181,25 @@ Vanuit de app kun je kopen en verkopen via de Handelen-knop of via Kopen/Verkope
   docker compose exec meridian python -m meridian handel maximum 500
   ```
 - Handelssleutel weghalen: `python -m meridian bron weg trading212-handel` (of `okx-handel`).
-- Echt geld kan de server nog niet. Dat komt later, als aparte stap die je zelf bewust aanzet.
+
+### Handelen met echt geld
+Standaard staat echt geld **uit**. Zo zet je het bewust aan:
+
+1. Op de server (je moet `ECHT GELD` typen om te bevestigen):
+   ```bash
+   docker compose exec meridian python -m meridian handel echtgeld aan
+   ```
+2. Maak een **nieuwe** sleutel in je echte account, apart van je leessleutel:
+   - Trading 212: Instellingen → API, rechten *Account data*, *Metadata*, *Portfolio* en *Orders*.
+   - OKX: Profiel → API, rechten **Read** en **Trade**. **Nooit Withdraw.**
+   - Beperk de sleutel tot het IP-adres van je thuisnetwerk als dat kan.
+3. Voeg hem toe met `--echt`:
+   ```bash
+   docker compose exec meridian python -m meridian bron trading212-handel --echt
+   docker compose exec meridian python -m meridian bron okx-handel --echt
+   ```
+
+Voor echt geld geldt een **eigen dagmaximum van € 25**, los van het oefengeld. Aanpassen: `handel echtgeld maximum 50`. Uitzetten kan altijd met `handel echtgeld uit`. In de app zie je een rode balk "ECHT GELD" en een extra waarschuwing voordat je bevestigt. Trading 212 staat met echt geld via de API alleen **marktorders** toe, geen limietorders.
 
 Lopende limietorders zie je in de app onder **Portefeuille → Orders**. Daar kun je de limiet wijzigen of de order annuleren.
 
@@ -220,6 +238,7 @@ docker compose restart
 | Trading 212: 401 | Sleutel of geheim klopt niet, of je gebruikt een demo-sleutel zonder `--demo` (of andersom). |
 | Trading 212: 403 | De sleutel mist leesrechten. Maak een nieuwe met *Account data*, *Metadata* en *Portfolio*. |
 | OKX: "Invalid Sign" of "Invalid OK-ACCESS-PASSPHRASE" | Secret of passphrase verkeerd geplakt; voeg de bron opnieuw toe. |
+| OKX: "APIKey does not match current environment" (50101) | Je gebruikt een sleutel van je echte account waar een demo-sleutel hoort (of andersom). Voor `okx-handel`: maak hem in Demo trading → Demo trading API. |
 | OKX: "API key doesn't exist" (50119) | De sleutel hoort bij een andere OKX-regio. De server zoekt die zelf (Europa = eea.okx.com); lukt dat niet, dan is de sleutel fout of gemaakt in de demo-omgeving (gebruik dan `--demo`). |
 | Trezor-saldo klopt niet | Controleer of je de sleutel van het juiste account hebt (Native SegWit, Taproot of Legacy). Heb je meerdere accounts, dan telt alleen dit ene mee. |
 | Handelen: "Nog geen handelssleutel" | Voeg de handelssleutel toe (stap 8). De leessleutel kan niet handelen. |

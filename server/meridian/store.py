@@ -126,7 +126,8 @@ class Store:
         rows = self._all(f"SELECT {', '.join(ORDER_FIELDS)} FROM orders ORDER BY ts DESC LIMIT ?", (limit,))
         return [dict(zip(ORDER_FIELDS, r)) for r in rows]
 
-    def traded_since(self, ts: float) -> float:
-        """Totaal in euro van geslaagde kopen/verkopen sinds `ts` (voor het dagmaximum)."""
-        row = self._one("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE ok = 1 AND action IN ('kopen', 'verkopen') AND ts >= ?", (ts,))
+    def traded_since(self, ts: float, demo: bool = True) -> float:
+        """Totaal in euro van geslaagde kopen/verkopen sinds `ts` (voor het dagmaximum), oefengeld en echt geld apart."""
+        row = self._one("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE ok = 1 AND action IN ('kopen', 'verkopen') "
+                        "AND ts >= ? AND demo = ?", (ts, int(demo)))
         return float(row[0])

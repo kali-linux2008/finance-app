@@ -107,8 +107,10 @@ def _trade_error(e: trading.TradeError) -> HTTPException:
 
 @app.get("/api/handel", dependencies=[Depends(device)])
 def trade_info(s: Store = Depends(store)) -> dict:
-    return {"connected": trading.connected(s), "live": trading.LIVE_ALLOWED,
-            "dayMax": trading.day_max(s), "usedToday": round(trading.used_today(s), 2)}
+    return {"connected": trading.connected(s), "live": trading.live_allowed(s),
+            "demo": {b: trading.is_demo(s, b) for b in trading.SECRET_IDS},
+            "dayMax": trading.day_max(s), "usedToday": round(trading.used_today(s), 2),
+            "liveDayMax": trading.day_max(s, False), "liveUsedToday": round(trading.used_today(s, False), 2)}
 
 
 @app.get("/api/handel/positie/{pos_id}", dependencies=[Depends(device)])

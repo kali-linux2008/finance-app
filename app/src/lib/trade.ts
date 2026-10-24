@@ -24,6 +24,8 @@ export type Quote = {
   minAmount: number;
   connected: boolean;
   demo: boolean;
+  /** false bij Trading 212 met echt geld: daar kan de API alleen marktorders. */
+  limitAllowed?: boolean;
   sellMax: number;
   sellQty: number;
   /** Vrij saldo in euro; null = onbekend. */
@@ -81,7 +83,8 @@ export function estimate(q: Quote, side: Side, amount: number, type: OrderType, 
   const max = Math.min(isBuy ? (q.cash ?? Infinity) : q.sellMax, left);
 
   let error = '';
-  if (amount <= 0) error = 'Voer een bedrag in';
+  if (type === 'limiet' && q.limitAllowed === false) error = 'Met echt geld kan Trading 212 alleen marktorders';
+  else if (amount <= 0) error = 'Voer een bedrag in';
   else if (amount < q.minAmount) error = `Minimaal € ${q.minAmount}`.replace('.', ',');
   else if (!isBuy && amount > q.sellMax + 0.005) {
     error = q.sellMax <= 0 ? `Je hebt geen ${q.tk} op ${q.brokerName}` : `Max ${euro(q.sellMax)}` + (q.broker === 'okx' ? ' op OKX · Trezor is alleen-lezen' : '');

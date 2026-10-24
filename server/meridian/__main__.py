@@ -30,7 +30,10 @@ HELP = """Meridian-server beheren
   python -m meridian handmatig             banksaldi (Rabobank), goud, pensioen en woning invullen
   python -m meridian status                alles ophalen en een overzicht tonen
   python -m meridian handel                handelen: sleutels, dagmaximum en het orderlogboek
-  python -m meridian handel maximum 250    dagmaximum voor handelen in euro instellen
+  python -m meridian handel maximum 250    dagmaximum voor oefengeld in euro instellen
+  python -m meridian handel echtgeld aan   handelen met echt geld toestaan (uit: handel echtgeld uit)
+  python -m meridian handel echtgeld maximum 25   dagmaximum voor echt geld
+  (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -121,7 +124,7 @@ def cmd_source(args: list[str]) -> None:
     sid = SOURCE_IDS.get(args[0])
     demo = "--demo" in args
     if sid in ("t212.handel", "okx.handel"):
-        add_trade_key(s, sid)
+        add_trade_key(s, sid, live="--echt" in args)
         return
     if sid == "t212":
         print("Trading 212 → Instellingen → API: maak een sleutel met alleen leesrechten.")
@@ -158,19 +161,34 @@ def cmd_source(args: list[str]) -> None:
     print("Opgeslagen (versleuteld).")
 
 
-def add_trade_key(s: Store, sid: str) -> None:
-    """Handelssleutel opslaan. In deze versie alleen voor oefengeld; de leessleutel blijft apart."""
-    print("Let op: deze sleutel mag kopen en verkopen. In deze versie werkt dat alleen met oefengeld (demo).")
+def add_trade_key(s: Store, sid: str, live: bool = False) -> None:
+    """Handelssleutel opslaan, apart van de leessleutel. Standaard oefengeld; met --echt je echte account."""
+    from . import trading
+
+    if live and not trading.live_allowed(s):
+        print("Handelen met echt geld staat uit. Zet het eerst aan met: python -m meridian handel echtgeld aan")
+        return
+    if live:
+        print("LET OP: deze sleutel handelt met ECHT GELD op je echte account.")
+        print(f"Dagmaximum voor echt geld: {eur(trading.day_max(s, False))}. Geef nooit het recht om op te nemen.")
+    else:
+        print("Let op: deze sleutel mag kopen en verkopen, met oefengeld (demo).")
     if sid == "t212.handel":
-        print("Trading 212 → wissel naar je oefenaccount (Practice) → Instellingen → API.")
-        print("Rechten: Account data, Metadata, Portfolio en Orders.")
-        secret = {"key": ask("API-sleutel", secret=True), "secret": ask("API-geheim", secret=True), "demo": True}
+        if live:
+            print("Trading 212 → je echte account → Instellingen → API → nieuwe sleutel.")
+        else:
+            print("Trading 212 → wissel naar je oefenaccount (Practice) → Instellingen → API.")
+        print("Rechten: Account data, Metadata, Portfolio en Orders. Beperk de sleutel bij voorkeur tot het IP-adres van je thuisnetwerk.")
+        secret = {"key": ask("API-sleutel", secret=True), "secret": ask("API-geheim", secret=True), "demo": not live}
         test = trading212.fetch
     else:
-        print("OKX → Trade → Demo trading → Profiel → Demo trading API → Create API key.")
-        print("Rechten: Read en Trade. Nooit Withdraw.")
+        if live:
+            print("OKX → Profiel → API → Create API key (je echte account).")
+        else:
+            print("OKX → Trade → Demo trading → Profiel → Demo trading API → Create API key.")
+        print("Rechten: Read en Trade. NOOIT Withdraw. Zet bij voorkeur het IP-adres van je thuisnetwerk erbij.")
         secret = {"key": ask("API-sleutel", secret=True), "secret": ask("Secret", secret=True),
-                  "passphrase": ask("Passphrase", secret=True), "demo": True}
+                  "passphrase": ask("Passphrase", secret=True), "demo": not live}
         print("OKX-regio zoeken…")
         try:
             async def detect() -> str:
@@ -188,18 +206,24 @@ def add_trade_key(s: Store, sid: str) -> None:
             async with httpx.AsyncClient(timeout=20) as c:
                 return await test(c, secret)
         res = asyncio.run(run())
-        print(f"Gelukt: oefenaccount met {eur(res.value)} in {len(res.positions)} posities")
+        print(f"Gelukt: {'echt account' if live else 'oefenaccount'} met {eur(res.value)} in {len(res.positions)} posities")
     except Exception as e:
         print("Mislukt:", describe(e))
+        if sid == "t212.handel" and "401" in str(e) and not live:
+            print("Tip: maak de sleutel aan terwijl je in je oefenaccount (Practice) zit; een sleutel van je echte "
+                  "account werkt hier niet. Plak sleutel en geheim elk apart en typ één opdracht tegelijk.")
         return
     s.set_secret(sid, secret)
-    print("Opgeslagen (versleuteld). Je kunt nu vanuit de app handelen met oefengeld.")
+    print("Opgeslagen (versleuteld). Je kunt nu vanuit de app handelen met " + ("ECHT GELD." if live else "oefengeld."))
 
 
 def cmd_trade(args: list[str]) -> None:
     from . import trading
 
     s = Store()
+    if args[:1] == ["echtgeld"]:
+        cmd_live(s, args[1:])
+        return
     if args[:1] == ["maximum"]:
         try:
             value = parse_amount(args[1])
@@ -212,18 +236,51 @@ def cmd_trade(args: list[str]) -> None:
         s.set_setting("trade.daymax", value)
         print(f"Dagmaximum ingesteld op {eur(value)}.")
         return
-    print("Handelen (alleen oefengeld in deze versie)\n")
+    print(f"Handelen · echt geld staat {'AAN' if trading.live_allowed(s) else 'uit'}\n")
     for broker, ok in trading.connected(s).items():
-        print(f"  {'✓' if ok else '·'} {trading.NAMES[broker]:<12} {'handelssleutel (demo)' if ok else 'geen handelssleutel'}")
-    print(f"\n  Dagmaximum: {eur(trading.day_max(s))} · vandaag gebruikt: {eur(trading.used_today(s))}\n")
+        kind = "oefengeld" if trading.is_demo(s, broker) else "ECHT GELD"
+        print(f"  {'✓' if ok else '·'} {trading.NAMES[broker]:<12} {f'handelssleutel ({kind})' if ok else 'geen handelssleutel'}")
+    print(f"\n  Oefengeld: dagmaximum {eur(trading.day_max(s))} · vandaag {eur(trading.used_today(s))}")
+    print(f"  Echt geld: dagmaximum {eur(trading.day_max(s, False))} · vandaag {eur(trading.used_today(s, False))}\n")
     rows = s.orders_log(20)
     if not rows:
         print("Nog geen orders.")
     for r in rows:
         when = datetime.fromtimestamp(r["ts"]).strftime("%d-%m %H:%M")
         amount = eur(r["amount"]) if r["amount"] else ""
-        mark = "✓" if r["ok"] else "✗"
+        mark = ("✓" if r["ok"] else "✗") + ("" if r["demo"] else " €")
         print(f"  {mark} {when}  {r['action']:<9} {r['symbol'][:16]:<16} {amount:>12}  {r['message'] or ''}")
+
+
+def cmd_live(s: Store, args: list[str]) -> None:
+    """Echt geld aan- of uitzetten, en het dagmaximum daarvoor."""
+    from . import trading
+
+    if args[:1] == ["uit"]:
+        s.set_setting("trade.live", False)
+        print("Handelen met echt geld staat UIT. De app kan alleen nog oefenen.")
+        return
+    if args[:1] == ["maximum"]:
+        try:
+            value = parse_amount(args[1])
+        except (IndexError, ValueError):
+            print("Gebruik: python -m meridian handel echtgeld maximum 25")
+            return
+        s.set_setting("trade.daymax.live", max(value, 0))
+        print(f"Dagmaximum voor echt geld: {eur(max(value, 0))}.")
+        return
+    if args[:1] == ["aan"]:
+        print("Hiermee kan de app kopen en verkopen met ECHT GELD, met elke order bevestigd met je vingerafdruk of pincode.")
+        print(f"Dagmaximum voor echt geld: {eur(trading.day_max(s, False))} (aanpassen: handel echtgeld maximum <bedrag>).")
+        print("Uitzetten kan altijd met: python -m meridian handel echtgeld uit")
+        if ask("Typ ECHT GELD om te bevestigen").upper() != "ECHT GELD":
+            print("Niet aangezet.")
+            return
+        s.set_setting("trade.live", True)
+        print("Echt geld staat AAN. Voeg nu een handelssleutel van je echte account toe, bijv.:")
+        print("  python -m meridian bron okx-handel --echt")
+        return
+    print("Gebruik: python -m meridian handel echtgeld aan | uit | maximum <bedrag>")
 
 
 def cmd_manual() -> None:
