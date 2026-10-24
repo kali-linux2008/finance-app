@@ -66,23 +66,33 @@ def address(key: HDKey, kind: str, chain: int, index: int) -> str:
 # Reserve als de eerste dienst traag is. Wie een eigen node instelt (MERIDIAN_ESPLORA_URL), gebruikt alleen die.
 FALLBACK_URL = "https://blockstream.info/api"
 PARALLEL = 4  # zoveel adressen tegelijk opvragen; meer maakt de openbare diensten boos
+TIMEOUT = 8  # per adres; een trage dienst slaan we liever over dan dat we erop wachten
+
+# De dienst die het laatst goed werkte, proberen we eerst. Zo betaalt niet elk adres
+# opnieuw de wachttijd van een dienst die traag is of ons tijdelijk weigert.
+_preferred: str | None = None
 
 
 def esplora_urls() -> list[str]:
     custom = config.ESPLORA_URL != "https://mempool.space/api"
-    return [config.ESPLORA_URL] if custom else [config.ESPLORA_URL, FALLBACK_URL]
+    urls = [config.ESPLORA_URL] if custom else [config.ESPLORA_URL, FALLBACK_URL]
+    if _preferred in urls:
+        urls.remove(_preferred)
+        urls.insert(0, _preferred)
+    return urls
 
 
 async def _address_info(client: httpx.AsyncClient, addr: str) -> tuple[int, int]:
     """(aantal transacties, saldo in satoshi incl. onbevestigd). Probeert per dienst twee keer."""
+    global _preferred
     problem = "Blockchain-dienst: te veel verzoeken, probeer het zo opnieuw."
     for base in esplora_urls():
         for attempt in range(2):
             try:
-                r = await client.get(f"{base}/address/{addr}", timeout=20)
+                r = await client.get(f"{base}/address/{addr}", timeout=TIMEOUT)
             except httpx.TimeoutException:
                 problem = f"Blockchain-dienst ({base}) reageert te traag. Probeer het zo opnieuw."
-                continue
+                break  # niet nog eens wachten: meteen de volgende dienst
             except httpx.HTTPError as e:
                 problem = f"Blockchain-dienst ({base}) niet bereikbaar: {e.__class__.__name__} {e}".strip()
                 break  # deze dienst is echt weg: meteen de volgende proberen
@@ -94,6 +104,7 @@ async def _address_info(client: httpx.AsyncClient, addr: str) -> tuple[int, int]
                 problem = f"Blockchain-dienst ({base}) gaf fout {r.status_code}"
                 break
             d = r.json()
+            _preferred = base
             cs, ms = d.get("chain_stats", {}), d.get("mempool_stats", {})
             txs = cs.get("tx_count", 0) + ms.get("tx_count", 0)
             sats = (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)

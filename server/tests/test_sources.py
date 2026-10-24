@@ -233,3 +233,15 @@ def test_cli_never_prints_an_empty_error():
     assert "te traag" in describe(httpx.ReadTimeout(""))
     assert "ConnectError" in describe(httpx.ConnectError(""))
     assert describe(RuntimeError()) == "RuntimeError"
+
+
+@respx.mock
+async def test_trezor_skips_slow_service_quickly_and_remembers_the_fast_one():
+    slow = respx.get(url__startswith="https://mempool.space/api/address/").mock(side_effect=httpx.ReadTimeout(""))
+    fast = respx.get(url__startswith="https://blockstream.info/api/address/").respond(
+        json={"chain_stats": {"tx_count": 0}, "mempool_stats": {}})
+    async with httpx.AsyncClient() as c:
+        assert await trezor._address_info(c, "bc1qaaa") == (0, 0)
+        assert slow.call_count == 1  # één keer proberen, niet twee keer wachten
+        await trezor._address_info(c, "bc1qbbb")
+    assert slow.call_count == 1 and fast.call_count == 2  # tweede adres meteen bij de snelle dienst
