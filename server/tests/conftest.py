@@ -8,7 +8,7 @@ import pytest
 from cryptography.fernet import Fernet
 
 from meridian import portfolio, prices
-from meridian.sources import trading212
+from meridian.sources import trading212, trezor
 from meridian.store import Store
 
 
@@ -22,4 +22,5 @@ def clear_caches():
     prices._cache.clear()
     trading212._meta.clear()
     portfolio._cache.clear()
+    trezor._preferred = None
     yield

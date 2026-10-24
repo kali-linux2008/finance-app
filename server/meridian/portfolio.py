@@ -13,7 +13,7 @@ from .sources import manual, okx, trading212, trezor
 from .store import Store
 
 FETCHERS = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch}
-TTL = {"t212": 60, "okx": 60, "trezor": 300}
+TTL = {"t212": 60, "okx": 60, "trezor": 900}  # Trezor-saldo verandert zelden en het opvragen is traag
 ORDER = ["t212", "bank", "trezor", "okx", "manual"]
 NAMES = {"t212": "Trading 212", "okx": "OKX", "trezor": "Trezor"}
 # Zo lang wacht de app op een bron. Is hij trager, dan krijgt de app de laatst bekende stand
