@@ -1,11 +1,12 @@
 // Hoofdkaart van het Overzicht: belegd vermogen, scrubbare grafiek, benchmarks en periodes.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Line as SvgLine } from 'react-native-svg';
-import { TOTAL } from '../data/sample';
 import { EURO, pct, signedEur, splitCents } from '../lib/format';
 import { PER, PERIODS, portfolioSeries, type Period } from '../lib/series';
+import { getHistory, type Point } from '../lib/api';
 import { useApp, useColors } from '../state/app';
+import { useData } from '../state/data';
 import { hero } from '../theme/tokens';
 import { Icon } from './Icon';
 import { LineChart, scrubIndex } from './LineChart';
@@ -25,27 +26,55 @@ export function HeroFrame({ children }: { children: ReactNode }) {
   );
 }
 
+/** Reeks voor de hero: voorbeelddata, of het echte verloop dat je server bijhoudt. */
+function useHeroSeries(period: Period) {
+  const { live, server, asOf } = useData();
+  const [points, setPoints] = useState<{ period: Period; pts: Point[] } | null>(null);
+  useEffect(() => {
+    if (!live || !server) return;
+    let gone = false;
+    getHistory(server, period)
+      .then((pts) => !gone && setPoints({ period, pts }))
+      .catch(() => !gone && setPoints({ period, pts: [] }));
+    return () => {
+      gone = true;
+    };
+  }, [live, server, period, asOf]);
+
+  if (!live) {
+    const s = portfolioSeries(period);
+    return { pf: s.pf, sp: s.sp, bt: s.bt, labels: s.labels, benchmarks: true };
+  }
+  const pts = points?.period === period ? points.pts : [];
+  return { pf: pts.map((p) => p.v), sp: [], bt: [], labels: pts.map((p) => PER[period].label(new Date(p.t * 1000))), benchmarks: false };
+}
+
 export function Hero() {
   const c = useColors();
   const { privacy } = useApp();
+  const { total, dayChange, live } = useData();
   const [period, setPeriod] = useState<Period>('Alles');
   const [scrub, setScrub] = useState<number | null>(null);
   const [sp, setSp] = useState(true);
   const [bt, setBt] = useState(false);
   const anim = useCountUp();
 
-  const series = portfolioSeries(period);
+  const series = useHeroSeries(period);
+  const hasChart = series.pf.length >= 2;
   const cfg = PER[period];
-  const i = scrubIndex(scrub, series.pf.length);
-  const value = i == null ? TOTAL : series.pf[i];
-  const diff = value - series.pf[0];
-  const [whole, cents] = splitCents(i == null ? TOTAL * anim : value);
-  const word = i == null ? cfg.word : 't.o.v. start';
+  const i = hasChart ? scrubIndex(scrub, series.pf.length) : null;
+  const value = i == null ? total : series.pf[i];
+  const [whole, cents] = splitCents(i == null ? total * anim : value);
+
+  // Verschil t.o.v. het begin van de periode; zonder verloop (nieuwe server) alleen "vandaag" als dat bekend is.
+  const start = hasChart ? series.pf[0] : null;
+  const diff = start != null ? value - start : dayChange;
+  const word = i != null ? 't.o.v. start' : start != null ? cfg.word : 'vandaag';
 
   const lines = useMemo(() => [
     { arr: series.pf, show: true, stroke: '#FFFFFF', width: 2 },
-    { arr: series.sp, show: sp, stroke: '#FFFFFF', width: 1.25, dash: '4 4', opacity: 0.6 },
-    { arr: series.bt, show: bt, stroke: hero.btcLine, width: 1.5, dash: '1 3', round: true },
+    { arr: series.sp, show: sp && series.benchmarks, stroke: '#FFFFFF', width: 1.25, dash: '4 4', opacity: 0.6 },
+    { arr: series.bt, show: bt && series.benchmarks, stroke: hero.btcLine, width: 1.5, dash: '1 3', round: true },
   ], [series, sp, bt]);
 
   return (
@@ -63,33 +92,48 @@ export function Hero() {
         {privacy ? '' : <T serif size={26} num color={hero.cents}>{cents}</T>}
       </T>
 
-      <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.16)' }}>
-        <Icon name={diff >= 0 ? 'north_east' : 'south_east'} size={16} color="#FFFFFF" />
-        <T size={13} w={600} num color="#FFFFFF">
-          {privacy ? `•••• ${i == null ? cfg.word : ''}` : `${signedEur(diff)} · ${pct((diff / series.pf[0]) * 100)} ${word}`}
-        </T>
-      </View>
+      {diff != null ? (
+        <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.16)' }}>
+          <Icon name={diff >= 0 ? 'north_east' : 'south_east'} size={16} color="#FFFFFF" />
+          <T size={13} w={600} num color="#FFFFFF">
+            {privacy ? `•••• ${i == null ? word : ''}` : `${signedEur(diff)} · ${pct((diff / ((start ?? total - diff) || 1)) * 100)} ${word}`}
+          </T>
+        </View>
+      ) : null}
 
       <View style={{ marginTop: 20 }}>
-        <LineChart
-          lines={lines}
-          labels={series.labels}
-          height={120}
-          scrub={scrub}
-          onScrub={setScrub}
-          areaFill="#FFFFFF"
-          areaOpacity={0.07}
-          axisColor={c.heroMuted}
-          scrubLine="rgba(255,255,255,0.6)"
-          dot={{ color: '#FFFFFF' }}
-          endDot={{ color: '#FFFFFF', halo: 'rgba(255,255,255,0.22)' }}
-          revealKey={period}
-        />
+        {hasChart ? (
+          <LineChart
+            lines={lines}
+            labels={series.labels}
+            height={120}
+            scrub={scrub}
+            onScrub={setScrub}
+            areaFill="#FFFFFF"
+            areaOpacity={0.07}
+            axisColor={c.heroMuted}
+            scrubLine="rgba(255,255,255,0.6)"
+            dot={{ color: '#FFFFFF' }}
+            endDot={{ color: '#FFFFFF', halo: 'rgba(255,255,255,0.22)' }}
+            revealKey={period}
+          />
+        ) : (
+          <View style={{ height: 120 + 8 + 15, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Icon name="insights" size={22} color={c.heroMuted} />
+            <T size={13} color={c.heroMuted} style={{ textAlign: 'center' }}>
+              {live ? 'Je server houdt vanaf nu het verloop bij.\nDe grafiek vult zich vanzelf.' : ''}
+            </T>
+          </View>
+        )}
       </View>
 
       <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 14 }}>
-        <BenchChip label="S&P 500" on={sp} onPress={() => setSp(!sp)} legend={<LegendLine color="#FFFFFF" dash="4 3" />} />
-        <BenchChip label="Bitcoin" on={bt} onPress={() => setBt(!bt)} legend={<LegendLine color={hero.btcLine} dash="2 3" />} />
+        {series.benchmarks ? (
+          <>
+            <BenchChip label="S&P 500" on={sp} onPress={() => setSp(!sp)} legend={<LegendLine color="#FFFFFF" dash="4 3" />} />
+            <BenchChip label="Bitcoin" on={bt} onPress={() => setBt(!bt)} legend={<LegendLine color={hero.btcLine} dash="2 3" />} />
+          </>
+        ) : null}
         <View style={{ flex: 1 }} />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Icon name="swipe" size={16} color={c.heroMuted} />

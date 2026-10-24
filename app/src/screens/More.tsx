@@ -9,6 +9,7 @@ import { T } from '../components/T';
 import { Card, IconButton } from '../components/ui';
 import { OPEN_ORDERS } from '../data/sample';
 import { useApp, useColors } from '../state/app';
+import { useData } from '../state/data';
 import { useLock } from '../state/lock';
 
 const ROWS: [IconName, string, string][] = [
@@ -28,6 +29,7 @@ export function More() {
   const insets = useSafeAreaInsets();
   const { theme, setTheme, privacy, togglePrivacy, say } = useApp();
   const { lock, biometricAvailable, biometricEnabled, setBiometricEnabled } = useLock();
+  const { server, error } = useData();
   const soon = () => say('Komt in een volgende stap');
 
   return (
@@ -48,6 +50,16 @@ export function More() {
         </View>
 
         <Card style={{ marginHorizontal: 12, paddingVertical: 4 }}>
+          <Pressable onPress={() => router.push('/server')} style={{ flexDirection: 'row', gap: 16, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
+            <Icon name="sync" size={22} color={server ? (error ? c.neg : c.pos) : c.muted} />
+            <View style={{ flex: 1 }}>
+              <T size={15} w={600}>Server</T>
+              <T size={12} color={c.muted} style={{ marginTop: 2 }} numberOfLines={1}>
+                {server ? `${error ? 'Niet bereikbaar' : 'Gekoppeld'} · ${server.url.replace(/^https?:\/\//, '')}` : 'Niet gekoppeld · je ziet voorbeelddata'}
+              </T>
+            </View>
+            <Icon name="chevron_right" size={20} color={c.faint} />
+          </Pressable>
           {ROWS.map(([icon, label, sub]) => (
             <Pressable key={label} onPress={soon} style={{ flexDirection: 'row', gap: 16, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
               <Icon name={icon} size={22} color={c.muted} />

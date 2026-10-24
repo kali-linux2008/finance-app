@@ -22,8 +22,10 @@ export type Position = {
   cur?: 'EUR' | 'USD';
   cost?: number;
   fees?: string;
-  /** Rendement in % per periode, in de volgorde 1D, 1W, 1M, 1J, Alles. */
+  /** Rendement in % per periode, in de volgorde 1D, 1W, 1M, 1J, Alles (alleen voorbeelddata). */
   returns?: [number, number, number, number, number];
+  /** % verandering vandaag, als de bron dat weet (echte data). */
+  dayChange?: number;
   /** Broker waarmee je deze belegging handelt. */
   trade?: 'Trading 212' | 'OKX';
   /** Maximaal te verkopen bedrag (BTC: alleen het OKX-deel). */
@@ -47,8 +49,8 @@ export const POSITIONS: Position[] = [
     ] },
   { id: 'eth', tk: 'ETH', name: 'Ethereum', cls: 'Crypto', cat: 'cr', src: 'OKX', qty: 0.82, unit: 'ETH', price: 2480, cur: 'EUR', value: 2034, cost: 2210, fees: '€ 1,90', returns: [-0.31, 2.1, -6.2, -8, -8], tile: 2, trade: 'OKX' },
   { id: 'sol', tk: 'SOL', name: 'Solana', cls: 'Crypto', cat: 'cr', src: 'OKX', qty: 4.3, unit: 'SOL', price: 145.3, cur: 'EUR', value: 625, cost: 520, fees: '€ 0,58', returns: [1.12, 4.8, -2.9, 18, 20], tile: 2, trade: 'OKX' },
-  { id: 'spaar', tk: 'ING', name: 'Oranje Spaarrekening', cls: 'Cash', cat: 'cash', src: 'ING', value: 12400, tile: 3, rate: '2,25% rente', note: 'Rente wordt maandelijks bijgeschreven. Deze rekening is gekoppeld aan je doel Noodbuffer.' },
-  { id: 'betaal', tk: 'ING', name: 'Betaalrekening', cls: 'Cash', cat: 'cash', src: 'ING', value: 2850, tile: 4, note: 'Saldo via PSD2-koppeling, elk uur bijgewerkt.' },
+  { id: 'spaar', tk: 'RABO', name: 'Rabo Spaarrekening', cls: 'Cash', cat: 'cash', src: 'Rabobank', value: 12400, tile: 3, rate: '2,25% rente', note: 'Rente wordt maandelijks bijgeschreven. Deze rekening is gekoppeld aan je doel Noodbuffer.' },
+  { id: 'betaal', tk: 'RABO', name: 'Betaalrekening', cls: 'Cash', cat: 'cash', src: 'Rabobank', value: 2850, tile: 4, note: 'Saldo handmatig ingevoerd. Een bankkoppeling via PSD2 komt later.' },
   { id: 'goud', tk: 'XAU', name: 'Goud · 22 g', cls: 'Goud', cat: 'gold', src: 'Handmatig', qty: 22, unit: 'g', price: 88.64, cur: 'EUR', value: 1950, cost: 1620, fees: '—', returns: [0.3, 0.9, 3.1, 28, 20], tile: 5, manual: true, note: 'Fysiek goud, handmatig ingevoerd. Waarde volgt de spotprijs.' },
 ];
 
@@ -65,25 +67,29 @@ export type Transaction = { month: string; date: string; title: string; sub: str
 export const TRANSACTIONS: Transaction[] = [
   { month: 'Oktober 2026', date: '15 okt', title: 'Koop VWCE', sub: 'Trading 212 · periodiek · 1,56 st', amount: -200, tk: 'VWCE' },
   { month: 'Oktober 2026', date: '12 okt', title: 'Koop BTC', sub: 'OKX · periodiek · 0,00207 BTC', amount: -190, tk: 'BTC' },
-  { month: 'Oktober 2026', date: '10 okt', title: 'Storting Trading 212', sub: 'ING → Trading 212', amount: 650 },
+  { month: 'Oktober 2026', date: '10 okt', title: 'Storting Trading 212', sub: 'Rabobank → Trading 212', amount: 650 },
   { month: 'Oktober 2026', date: '3 okt', title: 'Verkoop SOL', sub: 'OKX · 1,2 SOL à € 151,10', amount: 181.32, tk: 'SOL' },
-  { month: 'Oktober 2026', date: '1 okt', title: 'Rente spaarrekening', sub: 'ING · 2,25%', amount: 23.18 },
+  { month: 'Oktober 2026', date: '1 okt', title: 'Rente spaarrekening', sub: 'Rabobank · 2,25%', amount: 23.18 },
   { month: 'September 2026', date: '29 sep', title: 'Dividend VWCE', sub: 'Trading 212 · 142,3 st', amount: 70.1, tk: 'VWCE' },
   { month: 'September 2026', date: '25 sep', title: 'Koop ASML', sub: 'Trading 212 · 1 st à € 688,40', amount: -688.4, tk: 'ASML' },
   { month: 'September 2026', date: '15 sep', title: 'Koop VWCE', sub: 'Trading 212 · periodiek · 1,59 st', amount: -200, tk: 'VWCE' },
   { month: 'September 2026', date: '12 sep', title: 'Koop BTC', sub: 'OKX · periodiek · 0,00212 BTC', amount: -190, tk: 'BTC' },
-  { month: 'September 2026', date: '10 sep', title: 'Storting Trading 212', sub: 'ING → Trading 212', amount: 650 },
+  { month: 'September 2026', date: '10 sep', title: 'Storting Trading 212', sub: 'Rabobank → Trading 212', amount: 650 },
   { month: 'September 2026', date: '2 sep', title: 'Opname naar Trezor', sub: 'OKX → Trezor Safe 5 · 0,02 BTC', amount: 0, tk: 'BTC' },
-  { month: 'September 2026', date: '1 sep', title: 'Rente spaarrekening', sub: 'ING · 2,25%', amount: 22.94 },
+  { month: 'September 2026', date: '1 sep', title: 'Rente spaarrekening', sub: 'Rabobank · 2,25%', amount: 22.94 },
   { month: 'Augustus 2026', date: '14 aug', title: 'Dividend AAPL', sub: '$ 4,68 bruto · 15% bronbelasting', amount: 3.41, tk: 'AAPL' },
   { month: 'Augustus 2026', date: '7 aug', title: 'Dividend ASML', sub: 'Trading 212 · € 1,60 per aandeel', amount: 11.2, tk: 'ASML' },
 ];
 
-export type Source = { id: string; name: string; value: number; change?: number; sub?: string };
+export type Source = {
+  id: string; name: string; value: number; change?: number | null; sub?: string | null;
+  /** Alleen bij echte data: 'oud' = laatste goede stand, 'fout' = nog nooit gelukt. */
+  status?: 'ok' | 'oud' | 'fout'; error?: string | null; syncedAt?: number;
+};
 
 export const SOURCES: Source[] = [
   { id: 't212', name: 'Trading 212', value: 31640, change: 0.82 },
-  { id: 'ing', name: 'ING', value: 15250, sub: '2,25% rente' },
+  { id: 'bank', name: 'Rabobank', value: 15250, sub: '2,25% rente' },
   { id: 'trezor', name: 'Trezor Safe 5', value: 9870, change: -0.52 },
   { id: 'okx', name: 'OKX', value: 6120, change: -0.24 },
 ];
@@ -112,7 +118,11 @@ export const OPEN_ORDERS = 3;
 /** Doelverdeling voor herbalanceren, in %. */
 export const TARGETS: Record<Category, number> = { eq: 55, cr: 20, cash: 20, gold: 5 };
 
-export const OUTSIDE = { pension: 14300, woz: 285000, mortgage: 262400, equity: 22600 };
+export type Outside = {
+  pension?: number; pensionName?: string;
+  woz?: number; mortgage?: number; equity?: number; mortgageNote?: string;
+};
+export const OUTSIDE: Outside = { pension: 14300, pensionName: 'ABP', woz: 285000, mortgage: 262400, equity: 22600, mortgageNote: 'Annuïtair · 3,9% tot 2034' };
 export const BOX3 = { base: 58900, free: 57684, tax: 22 };
 export const GOALS = { fire: 500000, buffer: 15000, bufferSaved: 12400, monthly: 650, returnPct: 7 };
 

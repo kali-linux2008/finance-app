@@ -86,9 +86,12 @@ export function Chip({ label, on, onPress }: { label: string; on: boolean; onPre
   );
 }
 
-/** Knop van 52px: `primary` blauw verloop, `outline` gouden rand (Verkopen), `surface` neutraal. */
-export function Button({ label, onPress, variant = 'primary', icon, style }: {
-  label: string; onPress: () => void; variant?: 'primary' | 'outline' | 'surface'; icon?: IconName; style?: ViewStyle;
+/**
+ * Knop van 52px: `primary` blauw verloop, `outline` gouden rand (Verkopen), `surface` neutraal.
+ * Standaard deelt hij de ruimte in een rij (flex: 1); met `block` staat hij los op volle breedte.
+ */
+export function Button({ label, onPress, variant = 'primary', icon, style, block }: {
+  label: string; onPress: () => void; variant?: 'primary' | 'outline' | 'surface'; icon?: IconName; style?: ViewStyle; block?: boolean;
 }) {
   const c = useColors();
   const look: Record<typeof variant, [ViewStyle, string]> = {
@@ -101,7 +104,7 @@ export function Button({ label, onPress, variant = 'primary', icon, style }: {
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
-        { flex: 1, height: 52, borderRadius: radius.button, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] },
+        { ...(block ? { alignSelf: 'stretch' as const } : { flex: 1 }), height: 52, borderRadius: radius.button, flexDirection: 'row', gap: 8, alignItems: 'center', justifyContent: 'center', transform: [{ scale: pressed ? 0.98 : 1 }] },
         bg,
         style,
       ]}

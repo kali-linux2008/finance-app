@@ -14,6 +14,7 @@ import { Toast } from '../components/Toast';
 import { Loading } from '../screens/Loading';
 import { LockScreen } from '../screens/LockScreen';
 import { AppProvider, useApp } from '../state/app';
+import { DataProvider } from '../state/data';
 import { LockProvider, useLock } from '../state/lock';
 
 SplashScreen.preventAutoHideAsync();
@@ -33,7 +34,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AppProvider>
           <LockProvider>
-            <Shell />
+            <DataProvider>
+              <Shell />
+            </DataProvider>
           </LockProvider>
         </AppProvider>
       </SafeAreaProvider>

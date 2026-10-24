@@ -1,0 +1,18 @@
+services:
+  meridian:
+    build: .
+    container_name: meridian
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Database + hoofdsleutel. Een volume dat Docker zelf beheert, zodat de rechten altijd kloppen.
+      - meridian-data:/app/data
+    environment:
+      - TZ=Europe/Amsterdam
+    env_file:
+      - path: .env
+        required: false
+
+volumes:
+  meridian-data:

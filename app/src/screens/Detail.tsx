@@ -1,6 +1,6 @@
 // Detail van één belegging: koers in goud, scrubbare grafiek, positie, bewaarplekken, dividend, transacties.
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,27 +9,62 @@ import { LineChart, scrubIndex } from '../components/LineChart';
 import { ScreenIn } from '../components/motion';
 import { T } from '../components/T';
 import { Button, Card, IconButton, Segmented } from '../components/ui';
-import { POSITIONS, TRANSACTIONS } from '../data/sample';
+import { TRANSACTIONS } from '../data/sample';
+import { getCandles, type Point } from '../lib/api';
 import { currencyPrefix, num, pct, signedEur } from '../lib/format';
 import { positionStats } from '../lib/position';
 import { PER, PERIODS, portfolioSeries, positionSeries, type Period } from '../lib/series';
 import { useMoney } from '../hooks/useMoney';
 import { useApp, useColors } from '../state/app';
+import { useData } from '../state/data';
 
 export function Detail({ id }: { id: string }) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { say } = useApp();
   const { money, privacy, hide } = useMoney();
-  const pos = POSITIONS.find((p) => p.id === id) ?? POSITIONS[0];
+  const { positions, total, live, server } = useData();
+  const found = positions.find((p) => p.id === id);
   const [period, setPeriod] = useState<Period>('1J');
   const [scrub, setScrub] = useState<number | null>(null);
+  const [candles, setCandles] = useState<{ key: string; pts: Point[] } | null>(null);
+
+  // Echte koershistorie hebben we alleen voor crypto (openbare data van OKX).
+  const candleKey = live && server && found?.cat === 'cr' ? `${found.tk}:${period}` : null;
+  useEffect(() => {
+    if (!candleKey || !server || !found) return;
+    let gone = false;
+    getCandles(server, found.tk, period)
+      .then((pts) => !gone && setCandles({ key: candleKey, pts }))
+      .catch(() => !gone && setCandles({ key: candleKey, pts: [] }));
+    return () => {
+      gone = true;
+    };
+  }, [candleKey, server, found, period]);
 
   const chart = useMemo(() => {
-    if (!pos.price || !pos.returns) return null;
-    const arr = positionSeries(pos.id, pos.price, pos.returns[PERIODS.indexOf(period)], period, pos.cat === 'cr');
+    if (!found?.price) return null;
+    if (live) {
+      const pts = candles?.key === candleKey ? candles.pts : [];
+      if (pts.length < 2) return null;
+      return { arr: pts.map((p) => p.v), labels: pts.map((p) => PER[period].label(new Date(p.t * 1000))) };
+    }
+    if (!found.returns) return null;
+    const arr = positionSeries(found.id, found.price, found.returns[PERIODS.indexOf(period)], period, found.cat === 'cr');
     return { arr, labels: portfolioSeries(period).labels };
-  }, [pos, period]);
+  }, [found, period, live, candles, candleKey]);
+
+  if (!found) {
+    return (
+      <ScreenIn style={{ backgroundColor: c.bg, paddingTop: insets.top }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', padding: 4, height: 56 }}>
+          <IconButton name="arrow_back" size={24} onPress={() => router.back()} />
+        </View>
+        <T size={15} color={c.muted} style={{ paddingHorizontal: 24 }}>Deze positie bestaat niet (meer). Misschien is hij net verkocht.</T>
+      </ScreenIn>
+    );
+  }
+  const pos = found;
 
   const fmtPrice = (x: number) => currencyPrefix(pos.cur ?? 'EUR') + num(x, 2);
   let price: string;
@@ -42,13 +77,19 @@ export function Detail({ id }: { id: string }) {
     price = fmtPrice(pv);
     delta = `${pct(dd)}  ${i == null ? PER[period].word : chart.labels[i]}`;
     deltaColor = dd >= 0 ? c.pos : c.neg;
+  } else if (pos.price) {
+    // Echte data zonder grafiek: koers van nu en de dagbeweging als die bekend is.
+    price = fmtPrice(pos.price);
+    delta = pos.dayChange != null ? `${pct(pos.dayChange)}  vandaag` : pos.cat === 'eq' ? 'Koersverloop voor aandelen volgt later' : '';
+    deltaColor = pos.dayChange == null ? c.muted : pos.dayChange >= 0 ? c.pos : c.neg;
   } else {
     price = money(pos.value, true);
     delta = pos.rate ?? 'Saldo';
   }
 
-  const stats = positionStats(pos, money, hide, privacy);
-  const tx = TRANSACTIONS.filter((t) => t.tk === pos.tk).slice(0, 4);
+  const stats = positionStats(pos, total, money, hide, privacy);
+  // Transacties komen in stap 6 (Activiteit) van de server; tot die tijd alleen bij voorbeelddata.
+  const tx = live ? [] : TRANSACTIONS.filter((t) => t.tk === pos.tk).slice(0, 4);
 
   return (
     <ScreenIn style={{ backgroundColor: c.bg, paddingTop: insets.top }}>
@@ -167,7 +208,7 @@ export function Detail({ id }: { id: string }) {
         ) : null}
       </ScrollView>
 
-      {pos.trade ? (
+      {live ? null : pos.trade ? (
         <View style={{ flexDirection: 'row', gap: 8, paddingTop: 12, paddingHorizontal: 12, paddingBottom: 16 + insets.bottom, borderTopWidth: 1, borderTopColor: c.line, backgroundColor: c.bg }}>
           <Button label="Verkopen" variant="outline" onPress={() => say('Handelen komt in een volgende stap')} />
           <Button label="Kopen" onPress={() => say('Handelen komt in een volgende stap')} />
@@ -178,7 +219,7 @@ export function Detail({ id }: { id: string }) {
             label={pos.manual ? 'Waarde bijwerken' : 'Geld overboeken'}
             icon="edit"
             variant="surface"
-            style={{ flex: undefined }}
+            block
             onPress={() => say(pos.manual ? 'Waarde bijgewerkt naar spotprijs' : 'Overboeken opent je bank-app')}
           />
         </View>
