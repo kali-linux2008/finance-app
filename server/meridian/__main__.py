@@ -33,6 +33,7 @@ HELP = """Meridian-server beheren
   python -m meridian handel maximum 250    dagmaximum voor oefengeld in euro instellen
   python -m meridian handel echtgeld aan   handelen met echt geld toestaan (uit: handel echtgeld uit)
   python -m meridian handel echtgeld maximum 25   dagmaximum voor echt geld
+  python -m meridian handel periodiek      periodiek inleggen bekijken (aan / uit / maximum 400)
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
@@ -224,6 +225,9 @@ def cmd_trade(args: list[str]) -> None:
     if args[:1] == ["echtgeld"]:
         cmd_live(s, args[1:])
         return
+    if args[:1] == ["periodiek"]:
+        cmd_plan(s, args[1:])
+        return
     if args[:1] == ["maximum"]:
         try:
             value = parse_amount(args[1])
@@ -281,6 +285,47 @@ def cmd_live(s: Store, args: list[str]) -> None:
         print("  python -m meridian bron okx-handel --echt")
         return
     print("Gebruik: python -m meridian handel echtgeld aan | uit | maximum <bedrag>")
+
+
+def cmd_plan(s: Store, args: list[str]) -> None:
+    """Periodiek inleggen: tonen, aan/uit en maandmaximum."""
+    from . import plans
+
+    if args[:1] == ["uit"]:
+        s.set_setting("plan.enabled", False)
+        print("Periodiek inleggen staat UIT. De server koopt niets meer automatisch.")
+        return
+    if args[:1] == ["maximum"]:
+        try:
+            value = max(parse_amount(args[1]), 0)
+        except (IndexError, ValueError):
+            print("Gebruik: python -m meridian handel periodiek maximum 400")
+            return
+        s.set_setting("plan.monthmax", value)
+        print(f"Maandmaximum voor periodiek inleggen: {eur(value)}.")
+        return
+    if args[:1] == ["aan"]:
+        plan = plans.get_plan(s)
+        print("Hiermee koopt de server elke maand automatisch, zonder vingerafdruk, volgens het plan in de app.")
+        print(f"Plan nu: {eur(plans.total(plan))} per maand op dag {plan['day']} · maandmaximum {eur(plans.month_max(s))}.")
+        print("Uitzetten kan altijd met: python -m meridian handel periodiek uit")
+        if ask("Typ JA om aan te zetten").upper() != "JA":
+            print("Niet aangezet.")
+            return
+        s.set_setting("plan.enabled", True)
+        print("Periodiek inleggen staat AAN.")
+        return
+    plan = plans.get_plan(s)
+    print(f"Periodiek inleggen · automatisch kopen staat {'AAN' if plans.enabled(s) else 'uit'}")
+    print(f"Plan in de app: {'actief' if plan['active'] else 'gepauzeerd'} · dag {plan['day']} · "
+          f"{eur(plans.total(plan))} per maand · maandmaximum {eur(plans.month_max(s))}\n")
+    for line in plan["lines"]:
+        print(f"   {line['tk'] or line['posId']:<8} {line['name'][:30]:<30} {eur(line['amount']):>12}")
+    if (nxt := plans.next_run(s)) and plans.enabled(s):
+        print(f"\nVolgende inleg: {datetime.fromtimestamp(nxt).strftime('%d-%m-%Y %H:%M')}")
+    for run in (s.get_setting("plan.runs") or [])[:5]:
+        when = datetime.fromtimestamp(run["at"]).strftime("%d-%m %H:%M")
+        print(f"  {'✓' if run['ok'] else '✗'} {when}  {run['message']}")
 
 
 def cmd_manual() -> None:

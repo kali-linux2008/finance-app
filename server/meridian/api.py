@@ -9,7 +9,9 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import __version__, auth, config, portfolio, prices, trading
+import asyncio
+
+from . import __version__, auth, config, plans, portfolio, prices, trading
 from .store import Store
 
 state: dict = {}
@@ -20,7 +22,9 @@ async def lifespan(app: FastAPI):
     config.master_key(create=True)  # eerste start: hoofdsleutel aanmaken als die er nog niet is
     state.setdefault("store", Store())
     state["client"] = httpx.AsyncClient(timeout=15, headers={"User-Agent": f"meridian/{__version__}"})
+    planner = asyncio.create_task(plans.loop(state["store"], state["client"]))  # periodiek inleggen
     yield
+    planner.cancel()
     await state["client"].aclose()
 
 
@@ -28,7 +32,7 @@ app = FastAPI(title="Meridian", version=__version__, lifespan=lifespan, docs_url
 
 # Alleen voor testen met de webversie van de app; de telefoon-app heeft dit niet nodig.
 if origins := os.environ.get("MERIDIAN_CORS_ORIGINS"):
-    app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_methods=["GET", "POST"], allow_headers=["Authorization", "Content-Type"])
+    app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_methods=["GET", "POST", "PUT"], allow_headers=["Authorization", "Content-Type"])
 
 
 def store() -> Store:
@@ -165,3 +169,44 @@ async def trade_amend(body: OrderRef, s: Store = Depends(store), c: httpx.AsyncC
         return await trading.amend(s, c, body.id, body.limit)
     except trading.TradeError as e:
         raise _trade_error(e) from e
+
+
+# Periodiek inleggen. Het automatisch kopen zelf zet je aan op de server (handel periodiek aan).
+
+def _plan_state(s: Store) -> dict:
+    plan = plans.get_plan(s)
+    return {"plan": plan, "total": plans.total(plan), "enabled": plans.enabled(s), "monthMax": plans.month_max(s),
+            "nextRun": plans.next_run(s), "runs": s.get_setting("plan.runs") or []}
+
+
+@app.get("/api/plan", dependencies=[Depends(device)])
+def get_plan(s: Store = Depends(store)) -> dict:
+    return _plan_state(s)
+
+
+class PlanLine(BaseModel):
+    posId: str
+    amount: float
+    tk: str = ""
+    name: str = ""
+
+
+class PlanBody(BaseModel):
+    active: bool
+    day: int = plans.DEFAULT_DAY
+    lines: list[PlanLine]
+
+
+@app.put("/api/plan", dependencies=[Depends(device)])
+async def put_plan(body: PlanBody, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    try:
+        plan = plans.validate(s, body.model_dump())
+        for line in plan["lines"]:
+            prod = await trading.find_product(s, c, line["posId"])
+            if prod.broker != "t212":
+                raise trading.TradeError(f"{prod.tk}: periodiek inleggen kan voorlopig alleen bij Trading 212.")
+            line["tk"], line["name"] = prod.tk, prod.name
+    except trading.TradeError as e:
+        raise _trade_error(e) from e
+    s.set_setting("plan", plan)
+    return _plan_state(s)

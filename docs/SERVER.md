@@ -201,6 +201,18 @@ Standaard staat echt geld **uit**. Zo zet je het bewust aan:
 
 Voor echt geld geldt een **eigen dagmaximum van € 25**, los van het oefengeld. Aanpassen: `handel echtgeld maximum 50`. Uitzetten kan altijd met `handel echtgeld uit`. In de app zie je een rode balk "ECHT GELD" en een extra waarschuwing voordat je bevestigt. Trading 212 staat met echt geld via de API alleen **marktorders** toe, geen limietorders.
 
+### Periodiek inleggen
+Elke maand op een vaste dag dezelfde bedragen kopen bij Trading 212, zoals een spaarplan.
+
+1. Stel je plan in de app in: **Portefeuille → Periodiek**. Kies je beleggingen en bedragen, de inlegdag, en sla op met je vingerafdruk.
+2. Zet automatisch kopen één keer aan op de server (typ `JA` om te bevestigen):
+   ```bash
+   docker compose exec meridian python -m meridian handel periodiek aan
+   ```
+3. Maandmaximum (standaard € 400) aanpassen: `handel periodiek maximum 500`. Bekijken: `handel periodiek`. Uitzetten: `handel periodiek uit`.
+
+De server koopt op de inlegdag rond 15:45, als de Europese en Amerikaanse beurzen allebei open zijn. Valt de dag in het weekend, dan de eerstvolgende werkdag. Staat er te weinig vrij saldo, dan koopt hij niets en probeert hij het de volgende werkdag opnieuw. Elke maand wordt maar één keer gekocht. De inleg telt niet mee voor het dagmaximum.
+
 Lopende limietorders zie je in de app onder **Portefeuille → Orders**. Daar kun je de limiet wijzigen of de order annuleren.
 
 ## Bijwerken

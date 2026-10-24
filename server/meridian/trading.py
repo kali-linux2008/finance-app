@@ -315,16 +315,18 @@ class OrderRequest:
     request_id: str
 
 
-async def place(store: Store, client: httpx.AsyncClient, req: OrderRequest) -> dict:
+async def place(store: Store, client: httpx.AsyncClient, req: OrderRequest, plan: bool = False) -> dict:
+    """Plaatst een order. `plan=True`: onderdeel van periodiek inleggen (eigen maandmaximum, niet het dagmaximum)."""
     async with _lock:  # één order tegelijk, zodat het dagmaximum klopt
         if req.request_id and (prev := store.order_by_request(req.request_id)):
             return _result(prev)
         prod = await find_product(store, client, req.pos_id)
         secret = trade_secret(store, prod.broker)
         log = {"request_id": req.request_id or None, "broker": prod.broker, "demo": int(bool(secret.get("demo"))),
-               "action": req.side, "symbol": prod.symbol, "kind": req.type, "amount": round(req.amount, 2)}
+               "action": "periodiek" if plan else req.side, "symbol": prod.symbol, "kind": req.type,
+               "amount": round(req.amount, 2)}
         try:
-            _validate(store, req, bool(secret.get("demo")), prod.broker)
+            _validate(store, req, bool(secret.get("demo")), prod.broker, day_limit=not plan)
             placed = await (_place_t212 if prod.broker == "t212" else _place_okx)(client, secret, prod, req)
         except (TradeError, trading212.T212Error, okx.OkxError, prices.PriceError, httpx.HTTPError) as e:
             row = store.log_order(**log, ok=0, message=_describe(e))
@@ -334,7 +336,7 @@ async def place(store: Store, client: httpx.AsyncClient, req: OrderRequest) -> d
         return _result(row)
 
 
-def _validate(store: Store, req: OrderRequest, demo: bool, broker: str) -> None:
+def _validate(store: Store, req: OrderRequest, demo: bool, broker: str, day_limit: bool = True) -> None:
     if req.side not in ("kopen", "verkopen") or req.type not in ("markt", "limiet"):
         raise TradeError("Onbekend soort order.")
     if not math.isfinite(req.amount) or req.amount < MIN_EUR:
@@ -344,7 +346,7 @@ def _validate(store: Store, req: OrderRequest, demo: bool, broker: str) -> None:
     if req.type == "limiet" and broker == "t212" and not demo:
         raise TradeError("Trading 212 staat met echt geld via de API alleen marktorders toe.")
     left = day_max(store, demo) - used_today(store, demo)
-    if req.amount > left + 0.005:
+    if day_limit and req.amount > left + 0.005:
         cmd = "handel maximum" if demo else "handel echtgeld maximum"
         raise TradeError(f"Dagmaximum bereikt: je kunt vandaag nog voor {_eur(max(left, 0))} handelen. "
                          f"Aanpassen op de server: python -m meridian {cmd} <bedrag>")
