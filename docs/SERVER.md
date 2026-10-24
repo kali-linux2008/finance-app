@@ -184,6 +184,7 @@ docker compose restart
 | Trading 212: 401 | Sleutel of geheim klopt niet, of je gebruikt een demo-sleutel zonder `--demo` (of andersom). |
 | Trading 212: 403 | De sleutel mist leesrechten. Maak een nieuwe met *Account data*, *Metadata* en *Portfolio*. |
 | OKX: "Invalid Sign" of "Invalid OK-ACCESS-PASSPHRASE" | Secret of passphrase verkeerd geplakt; voeg de bron opnieuw toe. |
+| OKX: "API key doesn't exist" (50119) | De sleutel hoort bij een andere OKX-regio. De server zoekt die zelf (Europa = eea.okx.com); lukt dat niet, dan is de sleutel fout of gemaakt in de demo-omgeving (gebruik dan `--demo`). |
 | Trezor-saldo klopt niet | Controleer of je de sleutel van het juiste account hebt (Native SegWit, Taproot of Legacy). Heb je meerdere accounts, dan telt alleen dit ene mee. |
 | Logboek bekijken | `docker compose logs -f meridian` |
 
