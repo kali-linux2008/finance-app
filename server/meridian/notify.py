@@ -1,40 +1,32 @@
-"""Pushmeldingen via je eigen ntfy-server (draait naast Meridian in docker compose).
+"""Meldingen voor de app: een lijstje op de server dat de Meridian-app zelf ophaalt.
 
-De ntfy-app op je telefoon houdt verbinding met jouw server en toont de meldingen.
-Alles blijft in je eigen netwerk (thuis of via Tailscale): geen Google, geen Expo.
-Het onderwerp ("topic") is een lange willekeurige naam; wie die niet kent, ziet niets.
+Geen Google, geen Expo, geen andere app: de Meridian-app kijkt op de achtergrond
+(ongeveer elk kwartier) en zodra je hem opent bij je server of er iets nieuws is,
+en toont dat als melding op je telefoon.
 """
 
-import logging
-import secrets
+import time
 
 import httpx
 
-from . import config
 from .store import Store
 
-log = logging.getLogger("meridian.notify")
+KEEP = 50
 
 
-def topic(store: Store, new: bool = False) -> str:
-    """Geheime onderwerpnaam voor je meldingen; wordt één keer aangemaakt en bewaard."""
-    current = store.get_setting("push.topic")
-    if current and not new:
-        return current
-    name = "meridian-" + secrets.token_urlsafe(18)
-    store.set_setting("push.topic", name)
-    return name
+def events(store: Store, after: int = 0) -> list[dict]:
+    """Meldingen nieuwer dan `after` (id), oud → nieuw."""
+    return [e for e in store.get_setting("events") or [] if e["id"] > after]
 
 
-async def send(store: Store, client: httpx.AsyncClient, title: str, body: str, tags: list[str] | None = None) -> bool:
-    """Stuurt een melding. Geeft True terug als ntfy hem aannam; gooit nooit."""
-    message = {"topic": topic(store), "title": title, "message": body, "tags": tags or ["moneybag"]}
-    try:
-        r = await client.post(config.NTFY_URL, json=message, timeout=10)
-    except httpx.HTTPError as e:
-        log.warning("Melding versturen mislukt (%s): %s", config.NTFY_URL, e.__class__.__name__)
-        return False
-    if r.status_code >= 400:
-        log.warning("Melding versturen mislukt: ntfy gaf %s", r.status_code)
-        return False
+def add(store: Store, title: str, body: str, kind: str = "info") -> dict:
+    old = store.get_setting("events") or []
+    event = {"id": (old[-1]["id"] + 1) if old else 1, "at": time.time(), "title": title, "body": body, "kind": kind}
+    store.set_setting("events", (old + [event])[-KEEP:])
+    return event
+
+
+async def send(store: Store, client: httpx.AsyncClient | None, title: str, body: str, kind: str = "info") -> bool:
+    """Zet een melding klaar voor de app. (Async, zodat later ook direct versturen kan.)"""
+    add(store, title, body, kind)
     return True

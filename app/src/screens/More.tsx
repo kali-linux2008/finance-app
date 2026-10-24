@@ -8,6 +8,8 @@ import { ScreenIn } from '../components/motion';
 import { T } from '../components/T';
 import { Card, IconButton } from '../components/ui';
 import { OPEN_ORDERS } from '../data/sample';
+import { disableNotifications, enableNotifications, inExpoGo } from '../lib/alerts';
+import { getItem, KEYS } from '../lib/storage';
 import { useApp, useColors } from '../state/app';
 import { useData } from '../state/data';
 import { useLock } from '../state/lock';
@@ -31,6 +33,27 @@ export function More() {
   const { lock, biometricAvailable, biometricEnabled, setBiometricEnabled } = useLock();
   const { server, error } = useData();
   const soon = () => say('Komt in een volgende stap');
+  const [notify, setNotify] = useState(false);
+
+  useEffect(() => {
+    getItem(KEYS.notify).then((v) => setNotify(v === 'on')).catch(() => {});
+  }, []);
+
+  const toggleNotify = async () => {
+    try {
+      if (notify) {
+        await disableNotifications();
+        setNotify(false);
+        say('Meldingen uit');
+      } else {
+        await enableNotifications();
+        setNotify(true);
+        say(inExpoGo ? 'Meldingen aan (in Expo Go alleen als de app open is)' : 'Meldingen aan');
+      }
+    } catch (e) {
+      say((e as Error).message);
+    }
+  };
   return (
     <ScreenIn style={{ backgroundColor: c.bg, paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 4, height: 56 }}>
@@ -74,6 +97,12 @@ export function More() {
         <Card style={{ marginTop: 12, marginHorizontal: 16, paddingVertical: 4 }}>
           <ToggleRow label="Donker thema" sub="Volgt anders het systeem" on={theme === 'dark'} onToggle={() => setTheme(theme === 'dark' ? 'light' : 'dark')} />
           <ToggleRow label="Privacymodus" sub="Bedragen verbergen" on={privacy} onToggle={togglePrivacy} />
+          <ToggleRow
+            label="Meldingen"
+            sub={inExpoGo ? 'In Expo Go alleen als de app open is' : 'Ook als de app dicht is (ongeveer elk kwartier)'}
+            on={notify}
+            onToggle={toggleNotify}
+          />
           <ToggleRow
             label="Vingerafdruk bij openen"
             sub={biometricAvailable ? 'Pincode als terugval' : 'Geen vingerafdruk ingesteld op dit toestel'}

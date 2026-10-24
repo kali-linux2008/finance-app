@@ -28,7 +28,7 @@ export function Overview() {
   const soon = () => say('Komt in een volgende stap');
   const toPortfolio = (filter: Filter) => () => goTab('portfolio', { filter, group: 'cat' });
 
-  const { live, positions, total, dayChange, invested, cost, sources, outside, loading, refresh } = useData();
+  const { live, positions, total, dayChange, invested, cost, sources, outside, loading, refresh, unseen } = useData();
   const a = allocation(positions);
   const fireMonths = monthsToTarget(total, GOALS.monthly, GOALS.returnPct, GOALS.fire);
   const buffer = live ? a.savings : GOALS.bufferSaved;
@@ -49,9 +49,11 @@ export function Overview() {
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <IconButton name={privacy ? 'visibility_off' : 'visibility'} onPress={togglePrivacy} />
           <IconButton name="search" onPress={soon} />
-          <IconButton onPress={soon}>
+          <IconButton onPress={() => router.push('/meldingen')} label="Meldingen">
             <Icon name="notifications" />
-            <View style={{ position: 'absolute', top: 11, right: 11, width: 12, height: 12, borderRadius: 6, backgroundColor: c.accent, borderWidth: 2, borderColor: c.bg }} />
+            {!live || unseen ? (
+              <View style={{ position: 'absolute', top: 11, right: 11, width: 12, height: 12, borderRadius: 6, backgroundColor: c.accent, borderWidth: 2, borderColor: c.bg }} />
+            ) : null}
           </IconButton>
           <IconButton onPress={() => router.push('/meer')}>
             <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: c.surface2, alignItems: 'center', justifyContent: 'center' }}>

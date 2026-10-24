@@ -35,7 +35,7 @@ HELP = """Meridian-server beheren
   python -m meridian handel echtgeld maximum 25   dagmaximum voor echt geld
   python -m meridian handel periodiek      periodiek inleggen bekijken (aan / uit / maximum 400)
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
-  python -m meridian melding               meldingen instellen via je eigen ntfy-server (melding test = testmelding)
+  python -m meridian melding               laatste meldingen tonen (melding test = testmelding)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -330,27 +330,20 @@ def cmd_plan(s: Store, args: list[str]) -> None:
 
 
 def cmd_notify(args: list[str]) -> None:
-    """Meldingen via je eigen ntfy-server: uitleg tonen, testmelding, of een nieuw geheim onderwerp."""
+    """Meldingen voor de app tonen, of een testmelding klaarzetten."""
     from . import notify
 
     s = Store()
     if args[:1] == ["test"]:
-        async def run() -> bool:
-            async with httpx.AsyncClient(timeout=20) as c:
-                return await notify.send(s, c, "Meridian", "Testmelding: meldingen werken.", ["white_check_mark"])
-        if asyncio.run(run()):
-            print("Testmelding verstuurd. Zie je hem niet? Controleer het onderwerp en het serveradres in de ntfy-app.")
-        else:
-            print(f"Mislukt: ntfy niet bereikbaar op {config.NTFY_URL}. Draait hij? docker compose ps")
+        notify.add(s, "Meridian", "Testmelding: meldingen werken.")
+        print("Testmelding klaargezet. De app laat hem zien zodra hij bij de server kijkt:")
+        print("meteen als je hem opent, en anders binnen ongeveer een kwartier.")
         return
-    name = notify.topic(s, new=args[:1] == ["nieuw"])
-    print("Meldingen via je eigen ntfy-server\n")
-    print("1. Installeer de app 'ntfy' op je telefoon (Play Store of F-Droid).")
-    print("2. In de app: + → 'Use another server' aanvinken en invullen:")
-    print("     Server:    http://<adres-van-je-server>:8090   (bijv. je Tailscale-adres 100.x.y.z)")
-    print(f"     Onderwerp: {name}")
-    print("3. Test: python -m meridian melding test")
-    print("\nHoud het onderwerp geheim. Nieuw onderwerp nodig? python -m meridian melding nieuw")
+    items = notify.events(s)[-10:]
+    if not items:
+        print("Nog geen meldingen.")
+    for e in items:
+        print(f"  {datetime.fromtimestamp(e['at']).strftime('%d-%m %H:%M')}  {e['title']}: {e['body']}")
 
 
 def cmd_manual() -> None:
