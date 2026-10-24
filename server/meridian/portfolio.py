@@ -29,6 +29,19 @@ class Cached:
 _cache: dict[str, Cached] = {}
 
 
+def _to_json(res: SourceResult) -> dict:
+    return {"id": res.id, "name": res.name, "change": res.change, "sub": res.sub,
+            "positions": [p.to_json() for p in res.positions]}
+
+
+def _from_json(d: dict) -> SourceResult:
+    positions = []
+    for p in d.get("positions", []):
+        wallets = [Wallet(**w) for w in p.pop("wallets", None) or []] or None
+        positions.append(Position(**p, wallets=wallets))
+    return SourceResult(id=d["id"], name=d["name"], positions=positions, change=d.get("change"), sub=d.get("sub"))
+
+
 async def _source(client: httpx.AsyncClient, store: Store, sid: str, force: bool) -> Cached:
     c = _cache.setdefault(sid, Cached())
     async with c.lock:
@@ -37,8 +50,12 @@ async def _source(client: httpx.AsyncClient, store: Store, sid: str, force: bool
         try:
             c.result = await FETCHERS[sid](client, store.get_secret(sid) or {})
             c.at, c.error = time.time(), None
+            # Laatst bekende stand bewaren, zodat een storing na een herstart niet als € 0 telt.
+            store.set_setting(f"last.{sid}", {"at": c.at, "result": _to_json(c.result)})
         except Exception as e:  # één kapotte bron mag de rest niet tegenhouden
             c.error = str(e).strip() or f"Geen verbinding ({e.__class__.__name__})"
+            if c.result is None and (last := store.get_setting(f"last.{sid}")):
+                c.result, c.at = _from_json(last["result"]), last["at"]
         return c
 
 

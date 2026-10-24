@@ -147,8 +147,8 @@ async def test_balance_scans_until_gap_limit():
     async with httpx.AsyncClient() as c:
         sats = await trezor.balance_sats(c, ZPUB, gap=3)
     assert sats == 175_000
-    # ontvangen: 0,1 gebruikt + 3 leeg; wisselgeld: 0 gebruikt + 3 leeg
-    assert route.call_count == 5 + 4
+    # per 4 tegelijk: ontvangen 0–7 (0,1 gebruikt, daarna 3 leeg), wisselgeld 0–3 (0 gebruikt, daarna 3 leeg)
+    assert route.call_count == 8 + 4
 
 
 @respx.mock
@@ -195,9 +195,20 @@ async def test_okx_region_search_stops_on_other_errors_and_uses_saved_domain():
 @respx.mock
 async def test_trezor_network_errors_have_a_readable_message():
     respx.get(url__startswith="https://mempool.space/api/address/").mock(side_effect=httpx.ConnectError(""))
+    respx.get(url__startswith="https://blockstream.info/api/address/").mock(side_effect=httpx.ReadTimeout(""))
     async with httpx.AsyncClient() as c:
-        with pytest.raises(trezor.TrezorError, match="niet bereikbaar: ConnectError"):
+        with pytest.raises(trezor.TrezorError, match="blockstream.info.*te traag"):
             await trezor.balance_sats(c, ZPUB, gap=1)
+
+
+@respx.mock
+async def test_trezor_falls_back_to_blockstream_when_mempool_is_slow():
+    empty = {"chain_stats": {"tx_count": 0, "funded_txo_sum": 0, "spent_txo_sum": 0}, "mempool_stats": {}}
+    slow = respx.get(url__startswith="https://mempool.space/api/address/").mock(side_effect=httpx.ReadTimeout(""))
+    backup = respx.get(url__startswith="https://blockstream.info/api/address/").respond(json=empty)
+    async with httpx.AsyncClient() as c:
+        assert await trezor.balance_sats(c, ZPUB, gap=2) == 0
+    assert slow.called and backup.call_count == 8
 
 
 def test_cli_never_prints_an_empty_error():

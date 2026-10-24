@@ -63,30 +63,58 @@ def address(key: HDKey, kind: str, chain: int, index: int) -> str:
     return script.p2pkh(pub).address(net)
 
 
+# Reserve als de eerste dienst traag is. Wie een eigen node instelt (MERIDIAN_ESPLORA_URL), gebruikt alleen die.
+FALLBACK_URL = "https://blockstream.info/api"
+PARALLEL = 4  # zoveel adressen tegelijk opvragen; meer maakt de openbare diensten boos
+
+
+def esplora_urls() -> list[str]:
+    custom = config.ESPLORA_URL != "https://mempool.space/api"
+    return [config.ESPLORA_URL] if custom else [config.ESPLORA_URL, FALLBACK_URL]
+
+
 async def _address_info(client: httpx.AsyncClient, addr: str) -> tuple[int, int]:
-    """(aantal transacties, saldo in satoshi incl. onbevestigd)."""
-    for attempt in range(3):
-        try:
-            r = await client.get(f"{config.ESPLORA_URL}/address/{addr}", timeout=30)
-        except httpx.TimeoutException:
-            if attempt < 2:
-                await asyncio.sleep(2)
+    """(aantal transacties, saldo in satoshi incl. onbevestigd). Probeert per dienst twee keer."""
+    problem = "Blockchain-dienst: te veel verzoeken, probeer het zo opnieuw."
+    for base in esplora_urls():
+        for attempt in range(2):
+            try:
+                r = await client.get(f"{base}/address/{addr}", timeout=20)
+            except httpx.TimeoutException:
+                problem = f"Blockchain-dienst ({base}) reageert te traag. Probeer het zo opnieuw."
                 continue
-            raise TrezorError(f"Blockchain-dienst ({config.ESPLORA_URL}) reageert te traag. Probeer het zo opnieuw.") from None
-        except httpx.HTTPError as e:
-            raise TrezorError(f"Blockchain-dienst ({config.ESPLORA_URL}) niet bereikbaar: {e.__class__.__name__} {e}".strip()) from e
-        if r.status_code == 429:
-            await asyncio.sleep(1 + attempt * 2)
-            continue
-        if r.status_code >= 400:
-            raise TrezorError(f"Blockchain-dienst gaf fout {r.status_code}")
-        d = r.json()
-        cs, ms = d.get("chain_stats", {}), d.get("mempool_stats", {})
-        txs = cs.get("tx_count", 0) + ms.get("tx_count", 0)
-        sats = (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)
-                + ms.get("funded_txo_sum", 0) - ms.get("spent_txo_sum", 0))
-        return txs, sats
-    raise TrezorError("Blockchain-dienst: te veel verzoeken, probeer het zo opnieuw.")
+            except httpx.HTTPError as e:
+                problem = f"Blockchain-dienst ({base}) niet bereikbaar: {e.__class__.__name__} {e}".strip()
+                break  # deze dienst is echt weg: meteen de volgende proberen
+            if r.status_code == 429:
+                problem = f"Blockchain-dienst ({base}): te veel verzoeken, probeer het zo opnieuw."
+                await asyncio.sleep(1 + attempt * 2)
+                continue
+            if r.status_code >= 400:
+                problem = f"Blockchain-dienst ({base}) gaf fout {r.status_code}"
+                break
+            d = r.json()
+            cs, ms = d.get("chain_stats", {}), d.get("mempool_stats", {})
+            txs = cs.get("tx_count", 0) + ms.get("tx_count", 0)
+            sats = (cs.get("funded_txo_sum", 0) - cs.get("spent_txo_sum", 0)
+                    + ms.get("funded_txo_sum", 0) - ms.get("spent_txo_sum", 0))
+            return txs, sats
+    raise TrezorError(problem)
+
+
+async def _scan_chain(client: httpx.AsyncClient, key: HDKey, kind: str, chain: int, gap: int) -> int:
+    """Telt het saldo van één reeks adressen, steeds PARALLEL tegelijk, tot `gap` ongebruikte op rij."""
+    total, unused, i = 0, 0, 0
+    while unused < gap:
+        batch = [address(key, kind, chain, j) for j in range(i, i + PARALLEL)]
+        results = await asyncio.gather(*(_address_info(client, a) for a in batch))
+        for txs, sats in results:  # in volgorde, zodat de gap-telling klopt
+            if unused >= gap:
+                break
+            total += sats
+            unused = unused + 1 if txs == 0 else 0
+        i += PARALLEL
+    return total
 
 
 async def balance_sats(client: httpx.AsyncClient, public: str, gap: int = GAP_LIMIT) -> int:
@@ -97,15 +125,8 @@ async def balance_sats(client: httpx.AsyncClient, public: str, gap: int = GAP_LI
             if (await _address_info(client, address(key, candidate, 0, 0)))[0] > 0:
                 kind = candidate
                 break
-    total = 0
-    for chain in (0, 1):  # 0 = ontvangen, 1 = wisselgeld
-        unused, i = 0, 0
-        while unused < gap:
-            txs, sats = await _address_info(client, address(key, kind, chain, i))
-            total += sats
-            unused = unused + 1 if txs == 0 else 0
-            i += 1
-    return total
+    receive, change = await asyncio.gather(_scan_chain(client, key, kind, 0, gap), _scan_chain(client, key, kind, 1, gap))
+    return receive + change
 
 
 async def fetch(client: httpx.AsyncClient, secret: dict) -> SourceResult:

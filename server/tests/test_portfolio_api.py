@@ -74,3 +74,18 @@ def test_api_requires_pairing(store, fake_sources, monkeypatch):
         h = c.get("/api/history?period=1D", headers={"Authorization": f"Bearer {token}"}).json()
         assert len(h["points"]) == 1
         assert c.get("/api/history?period=5J", headers={"Authorization": f"Bearer {token}"}).status_code == 422
+
+
+async def test_failed_source_shows_last_known_value_even_after_restart(store, fake_sources, monkeypatch):
+    await portfolio.build(store, client=None)  # alles lukt: laatste standen bewaard
+    portfolio._cache.clear()  # alsof de server herstart
+
+    async def slow(client, secret):
+        raise RuntimeError("Blockchain-dienst reageert te traag")
+
+    monkeypatch.setitem(portfolio.FETCHERS, "trezor", slow)
+    p = await portfolio.build(store, client=None)
+    tz = next(s for s in p["sources"] if s["id"] == "trezor")
+    assert tz["status"] == "oud" and tz["value"] == 9870 and "traag" in tz["error"]
+    btc = next(x for x in p["positions"] if x["tk"] == "BTC")
+    assert btc["value"] == 9870 + 3461
