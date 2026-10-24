@@ -54,8 +54,24 @@ cd ~/finance-app && git pull
 
 en installeer de nieuwe `meridian.apk` over de oude heen (stap 2). Je pincode en koppeling blijven bewaard.
 
+## Weinig geheugen? Swap toevoegen
+
+Swap is extra "geheugen" op de schijf. Langzamer, maar het voorkomt dat het bouwen wordt afgebroken. Eenmalig:
+
+```bash
+free -h                                   # kijk hoeveel geheugen en swap er is
+sudo fallocate -l 6G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab   # blijft na herstart
+```
+
+Bestaat `/swapfile` al, sla dit dan over (of kijk met `swapon --show`).
+
 ## Goed om te weten
 
+- De app wordt alleen gebouwd voor moderne telefoons (64-bit ARM, vrijwel alle Android-telefoons sinds 2017). Dat scheelt geheugen en tijd.
 - De app wordt ondertekend met de standaard-ontwikkelsleutel van React Native. Prima voor een app die alleen jij zelf installeert; zet hem niet in een winkel en installeer alleen APK's die je zelf hebt gebouwd.
 - Expo Go blijft werken voor als je wilt meekijken tijdens het ontwikkelen.
 
@@ -63,7 +79,7 @@ en installeer de nieuwe `meridian.apk` over de oude heen (stap 2). Je pincode en
 
 | Probleem | Oplossing |
 |---|---|
-| Bouwen stopt met "Killed" of "out of memory" | Te weinig geheugen. Stop tijdelijk andere containers of voeg swap toe: `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`. |
+| Bouwen stopt met "Killed", "out of memory" of "daemon disappeared unexpectedly" | Te weinig geheugen. Voeg swap toe (zie hieronder) en probeer opnieuw. Nog steeds niet? `MERIDIAN_BOUW_WORKERS=1 ./build/android/bouw.sh`. |
 | "No space left on device" | Ruim oude Docker-onderdelen op: `docker system prune` (je Meridian-gegevens blijven, die staan in een volume). |
 | Telefoon kan het bestand niet downloaden | Staat de downloadpagina nog aan? Zelfde wifi of Tailscale aan? Firewall: `sudo ufw allow from 192.168.0.0/16 to any port 8080`. |
 | "App niet geïnstalleerd" bij bijwerken | Verwijder de oude Meridian-app eerst (je moet daarna opnieuw koppelen). |
