@@ -38,7 +38,7 @@ async def _source(client: httpx.AsyncClient, store: Store, sid: str, force: bool
             c.result = await FETCHERS[sid](client, store.get_secret(sid) or {})
             c.at, c.error = time.time(), None
         except Exception as e:  # één kapotte bron mag de rest niet tegenhouden
-            c.error = str(e) or e.__class__.__name__
+            c.error = str(e).strip() or f"Geen verbinding ({e.__class__.__name__})"
         return c
 
 

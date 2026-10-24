@@ -190,3 +190,19 @@ async def test_okx_region_search_stops_on_other_errors_and_uses_saved_domain():
     async with httpx.AsyncClient() as c:
         res = await okx.fetch(c, {"key": "k", "secret": "s", "passphrase": "p", "domain": "https://eea.okx.com"})
     assert route.called and res.positions == []
+
+
+@respx.mock
+async def test_trezor_network_errors_have_a_readable_message():
+    respx.get(url__startswith="https://mempool.space/api/address/").mock(side_effect=httpx.ConnectError(""))
+    async with httpx.AsyncClient() as c:
+        with pytest.raises(trezor.TrezorError, match="niet bereikbaar: ConnectError"):
+            await trezor.balance_sats(c, ZPUB, gap=1)
+
+
+def test_cli_never_prints_an_empty_error():
+    from meridian.__main__ import describe
+
+    assert "te traag" in describe(httpx.ReadTimeout(""))
+    assert "ConnectError" in describe(httpx.ConnectError(""))
+    assert describe(RuntimeError()) == "RuntimeError"

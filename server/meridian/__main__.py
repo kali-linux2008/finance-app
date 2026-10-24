@@ -65,6 +65,16 @@ def ask_number(prompt: str, default: float | None = None) -> float | None:
             print("  Vul een getal in, bijv. 12400 of 12.400,50")
 
 
+def describe(e: Exception) -> str:
+    """Foutmelding die nooit leeg is (netwerkfouten van httpx hebben vaak geen tekst)."""
+    text = str(e).strip()
+    if isinstance(e, httpx.TimeoutException):
+        return f"De dienst reageert te traag ({e.__class__.__name__}). Controleer de internetverbinding van de server."
+    if isinstance(e, httpx.HTTPError):
+        return f"Geen verbinding ({e.__class__.__name__}){': ' + text if text else ''}. Controleer de internetverbinding van de server."
+    return text or e.__class__.__name__
+
+
 def cmd_init() -> None:
     existed = bool(os.environ.get("MERIDIAN_MASTER_KEY")) or config.KEY_PATH.exists()
     config.master_key(create=True)
@@ -115,7 +125,7 @@ def cmd_source(args: list[str]) -> None:
             secret["domain"] = asyncio.run(detect())
             print(f"Gevonden: {secret['domain']}")
         except Exception as e:
-            print("Mislukt:", e)
+            print("Mislukt:", describe(e))
             return
     elif sid == "trezor":
         print("Trezor Suite → je Bitcoin-account → Details → Toon publieke sleutel.")
@@ -128,7 +138,7 @@ def cmd_source(args: list[str]) -> None:
     try:
         asyncio.run(_test(sid, secret))
     except Exception as e:
-        print("Mislukt:", e)
+        print("Mislukt:", describe(e))
         if ask("Toch opslaan? (j/n)", "n").lower() != "j":
             return
     s.set_secret(sid, secret)
