@@ -27,11 +27,12 @@ export function Portfolio() {
   const { live, positions, total, dayChange, outside, loading, refresh } = useData();
   const groups = view.group === 'cat' ? groupByCategory(positions, view.filter) : groupBySource(positions, view.filter);
   const devs = rebalanceDeviations(positions, total);
-  const orders = { icon: 'pending_actions' as IconName, label: 'Orders', sub: live ? 'Oefenaccount' : `${OPEN_ORDERS} open`, dot: false, go: () => router.push('/orders') };
-  // Periodiek inleggen en herbalanceren komen later; met echte data tonen we alleen Orders.
-  const links: { icon: IconName; label: string; sub: string; dot: boolean; go: () => void }[] = live ? [orders] : [
+  const orders = { icon: 'pending_actions' as IconName, label: 'Orders', sub: live ? 'Bekijken' : `${OPEN_ORDERS} open`, dot: false, go: () => router.push('/orders') };
+  const periodic = { icon: 'autorenew' as IconName, label: 'Periodiek', sub: live ? 'Inlegplan' : `${money(monthlyInvesting())} p/m`, dot: false, go: () => router.push('/periodiek') };
+  // Herbalanceren komt later; met echte data tonen we Orders en Periodiek.
+  const links: { icon: IconName; label: string; sub: string; dot: boolean; go: () => void }[] = live ? [orders, periodic] : [
     orders,
-    { icon: 'autorenew', label: 'Periodiek', sub: `${money(monthlyInvesting())} p/m`, dot: false, go: soon },
+    periodic,
     { icon: 'balance', label: 'Balans', sub: devs ? `${devs} ${devs === 1 ? 'afwijking' : 'afwijkingen'}` : 'in balans', dot: devs > 0, go: soon },
   ];
   const watch = [...WATCHLIST].sort((a, b) => b.change - a.change);

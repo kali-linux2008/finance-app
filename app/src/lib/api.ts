@@ -110,3 +110,17 @@ export const cancelOrder = (cfg: ServerConfig, id: string) =>
 
 export const amendOrder = (cfg: ServerConfig, id: string, limit: number) =>
   request<{ ok: boolean; id: string }>(`${cfg.url}/api/handel/orders/limiet`, post(cfg, { id, limit }), 30000);
+
+// Periodiek inleggen
+export type PlanLine = { posId: string; amount: number; tk?: string; name?: string };
+export type Plan = { active: boolean; day: number; lines: PlanLine[] };
+export type PlanRun = {
+  month: string; at: number; total: number; ok: boolean; message: string | null;
+  lines: (PlanLine & { ok: boolean; message: string | null })[];
+};
+export type PlanState = { plan: Plan; total: number; enabled: boolean; monthMax: number; nextRun: number | null; runs: PlanRun[] };
+
+export const getPlan = (cfg: ServerConfig) => request<PlanState>(`${cfg.url}/api/plan`, auth(cfg));
+
+export const savePlan = (cfg: ServerConfig, plan: Plan) =>
+  request<PlanState>(`${cfg.url}/api/plan`, { ...post(cfg, plan), method: 'PUT' }, 30000);

@@ -21,7 +21,8 @@ Installeren en gebruiken: zie **[docs/SERVER.md](../docs/SERVER.md)**.
 ```
 meridian/
   api.py          HTTP-API voor de app (/api/health, /api/koppel, /api/portfolio, /api/history, /api/candles, /api/handel/…)
-  trading.py      orders naar Trading 212 en OKX (alleen demo), controles en orderlogboek
+  trading.py      orders naar Trading 212 en OKX, controles en orderlogboek
+  plans.py        periodiek inleggen: plan, planner (elke 5 min) en verslag per maand
   portfolio.py    bronnen ophalen, samenvoegen (BTC op Trezor + OKX = één positie), verloop bijhouden
   sources/        trading212.py · okx.py · trezor.py · manual.py
   prices.py       koersen in euro via de openbare OKX-marktdata

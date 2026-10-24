@@ -43,9 +43,9 @@ export function GoldCaption({ children }: { children: string }) {
 }
 
 /** Ronde icoonknop van 44×44 (minimale aanraakgrootte). */
-export function IconButton({ name, onPress, size = 22, color, children }: { name?: IconName; onPress?: () => void; size?: number; color?: string; children?: ReactNode }) {
+export function IconButton({ name, onPress, size = 22, color, children, label }: { name?: IconName; onPress?: () => void; size?: number; color?: string; children?: ReactNode; label?: string }) {
   return (
-    <Pressable onPress={onPress} hitSlop={2} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+    <Pressable onPress={onPress} hitSlop={2} accessibilityLabel={label} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
       {children ?? (name ? <Icon name={name} size={size} color={color} /> : null)}
     </Pressable>
   );
