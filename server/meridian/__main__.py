@@ -210,7 +210,7 @@ def main(argv: list[str]) -> None:
     elif cmd == "koppelcode":
         code = auth.new_pair_code(Store())
         print(f"Koppelcode: {code[:3]} {code[3:]}  (10 minuten geldig)")
-        print("Vul deze in de app in: Meer → Server koppelen.")
+        print("Vul deze in de app in: tik rechtsboven op JV → Server.")
     elif cmd == "bron":
         cmd_source(args)
     elif cmd == "handmatig":
