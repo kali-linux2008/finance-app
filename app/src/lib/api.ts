@@ -131,3 +131,9 @@ export type ServerEvent = { id: number; at: number; title: string; body: string;
 
 export const getEvents = async (cfg: ServerConfig, after = 0) =>
   (await request<{ events: ServerEvent[] }>(`${cfg.url}/api/meldingen?na=${after}`, auth(cfg), 15000)).events;
+
+// App-updates: de nieuwste APK die op je server is gebouwd.
+export type AppBuild = { versionCode: number; version: string; built: number | null; size: number; sha256: string | null };
+
+export const getAppBuild = async (cfg: ServerConfig) =>
+  (await request<{ available: AppBuild | null }>(`${cfg.url}/api/app`, auth(cfg), 10000)).available;
