@@ -7,6 +7,7 @@ import { ApiError, checkServer, getAppBuild, getEvents, getPortfolio, normalizeU
 import { investedAndCost } from '../lib/portfolio';
 import { deleteItem, getItem, KEYS, setItem } from '../lib/storage';
 import { canUpdate, installedVersion, isNewer } from '../lib/update';
+import { refreshWidgets } from '../widgets/update';
 import { useLock } from './lock';
 
 export type Holdings = {
@@ -81,6 +82,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     try {
       setHoldings(fromResponse(await getPortfolio(server, force)));
       setError(null);
+      refreshWidgets(server).catch(() => {});  // hooguit elke 5 minuten
       // Meldingen: nieuwe tonen op de telefoon, en de lijst bijwerken voor het belletje.
       await checkEvents(server).catch(() => {});
       setEvents((await getEvents(server).catch(() => [])).slice().reverse());

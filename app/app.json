@@ -53,6 +53,66 @@
           "icon": "./assets/notification-icon.png",
           "color": "#2840A8"
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/source-serif-4/400Regular/SourceSerif4_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/manrope/600SemiBold/Manrope_600SemiBold.ttf",
+            "./node_modules/@expo-google-fonts/manrope/700Bold/Manrope_700Bold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "MeridianGroot",
+              "label": "Meridian \u00b7 belegd",
+              "description": "Totaal, vandaag en de grootste bewegers",
+              "minWidth": "250dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 2,
+              "previewImage": "./assets/widgets/groot.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "MeridianTotaal",
+              "label": "Meridian \u00b7 totaal",
+              "description": "Totaal met grafiek van vandaag",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "previewImage": "./assets/widgets/totaal.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "MeridianDoel",
+              "label": "Meridian \u00b7 FIRE-doel",
+              "description": "Voortgang naar je FIRE-doel",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "previewImage": "./assets/widgets/doel.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "MeridianSmal",
+              "label": "Meridian \u00b7 smal",
+              "description": "Totaal en dagverandering op \u00e9\u00e9n regel",
+              "minWidth": "250dp",
+              "minHeight": "50dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 1,
+              "previewImage": "./assets/widgets/smal.png",
+              "resizeMode": "horizontal",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ]
   }

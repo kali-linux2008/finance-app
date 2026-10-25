@@ -64,6 +64,17 @@ De eerste keer vraagt Android of Meridian apps mag installeren: tik op **Instell
 
 De server biedt de app alleen aan gekoppelde telefoons aan. Android installeert een update alleen als hij met dezelfde sleutel is ondertekend als de app die al op je telefoon staat.
 
+## Widgets op je startscherm
+
+Houd je vinger op een lege plek van je startscherm → **Widgets** → **Meridian**. Er zijn vier formaten:
+
+- **Meridian · belegd** (4×2): totaal, dagverandering, grafiek van vandaag en de drie grootste bewegers;
+- **Meridian · totaal** (2×2): totaal met grafiek;
+- **Meridian · FIRE-doel** (2×2): voortgang naar € 500k;
+- **Meridian · smal** (4×1): totaal en dagverandering op één regel.
+
+Tik op een widget om Meridian te openen. Ze worden bijgewerkt als je de app opent, ongeveer elk kwartier op de achtergrond (als Meldingen aan staat) en anders minstens elk half uur. Met privacymodus aan tonen ze `€ ••••`. Kan de server even niet bereikt worden, dan zie je de laatste stand.
+
 ## Weinig geheugen? Swap toevoegen
 
 Swap is extra "geheugen" op de schijf. Langzamer, maar het voorkomt dat het bouwen wordt afgebroken. Eenmalig:

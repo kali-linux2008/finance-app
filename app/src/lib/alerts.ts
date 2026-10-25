@@ -50,6 +50,8 @@ if (native) {
   TaskManager.defineTask(TASK, async () => {
     try {
       await checkEvents();
+      // Widgets ook bijwerken (Android doet dat zelf maar elk half uur).
+      await (await import('../widgets/update')).refreshWidgets(null, true).catch(() => {});
       return BackgroundTask.BackgroundTaskResult.Success;
     } catch {
       return BackgroundTask.BackgroundTaskResult.Failed;

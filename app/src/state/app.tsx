@@ -1,5 +1,7 @@
 // Gedeelde app-status: thema, privacymodus, melding onderin en de actieve tab.
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { getItem, KEYS, setItem } from '../lib/storage';
+import { refreshWidgets } from '../widgets/update';
 import { dark, light, type Palette } from '../theme/tokens';
 import type { Filter } from '../lib/portfolio';
 
@@ -32,6 +34,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [portfolioView, setView] = useState<PortfolioView>({ group: 'cat', metric: 'dag', filter: 'Alles' });
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
+  // Privacymodus onthouden; de widgets op je startscherm volgen hem ook.
+  useEffect(() => {
+    getItem(KEYS.privacy).then((v) => v === 'on' && setPrivacy(true)).catch(() => {});
+  }, []);
+  const togglePrivacy = useCallback(() => {
+    const next = !privacy;
+    setPrivacy(next);
+    setItem(KEYS.privacy, next ? 'on' : 'off').then(() => refreshWidgets(null, true)).catch(() => {});
+  }, [privacy]);
+
   const say = useCallback((msg: string) => {
     clearTimeout(timer.current);
     setToast(msg);
@@ -45,9 +57,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<AppState>(() => ({
     theme, colors: theme === 'dark' ? dark : light, setTheme,
-    privacy, togglePrivacy: () => setPrivacy((p) => !p),
+    privacy, togglePrivacy,
     toast, say, tab, goTab, portfolioView, setPortfolioView,
-  }), [theme, privacy, toast, say, tab, goTab, portfolioView, setPortfolioView]);
+  }), [theme, privacy, togglePrivacy, toast, say, tab, goTab, portfolioView, setPortfolioView]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
