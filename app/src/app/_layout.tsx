@@ -6,7 +6,7 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -15,6 +15,7 @@ import { TradeSheet } from '../components/TradeSheet';
 import { configureNotifications } from '../lib/alerts';
 import { Loading } from '../screens/Loading';
 import { LockScreen } from '../screens/LockScreen';
+import { Splash } from '../screens/Splash';
 import { AppProvider, useApp } from '../state/app';
 import { DataProvider } from '../state/data';
 import { LockProvider, useLock } from '../state/lock';
@@ -54,12 +55,14 @@ function Shell() {
   const { theme, colors } = useApp();
   const { phase } = useLock();
   const locked = phase === 'setup' || phase === 'locked';
+  const [intro, setIntro] = useState(true);
+  const introDone = useCallback(() => setIntro(false), []);
   useEffect(() => {
     SystemUI.setBackgroundColorAsync(colors.bg);
   }, [colors.bg]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <StatusBar style={locked || theme === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={intro ? (theme === 'dark' ? 'light' : 'dark') : locked || theme === 'dark' ? 'light' : 'dark'} />
       {/* Zolang de app vergrendeld is, worden de schermen met bedragen niet eens getekend. */}
       {locked ? <LockScreen /> : null}
       {phase === 'loading' ? <Loading /> : null}
@@ -69,6 +72,7 @@ function Shell() {
       ) : null}
       {phase === 'open' ? <TradeSheet /> : null}
       <Toast />
+      {intro ? <Splash onDone={introDone} /> : null}
     </View>
   );
 }

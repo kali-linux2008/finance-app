@@ -17,7 +17,9 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "nl.jarno.meridian",
-      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"]
+      "permissions": [
+        "android.permission.REQUEST_INSTALL_PACKAGES"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -29,9 +31,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#15140F",
+          "backgroundColor": "#1E2E8C",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 160
+          "imageWidth": 112
         }
       ],
       "expo-system-ui",
@@ -44,7 +46,14 @@
           }
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2840A8"
+        }
+      ]
     ]
   }
 }

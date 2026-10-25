@@ -69,7 +69,11 @@ export async function configureNotifications() {
 export async function enableNotifications(): Promise<void> {
   if (!native) throw new Error('Meldingen werken alleen op je telefoon.');
   const N = await notifications();
-  await N.setNotificationChannelAsync('default', { name: 'Meridian', importance: N.AndroidImportance.HIGH, lightColor: '#D9BC82' });
+  // Op het vergrendelscherm zonder inhoud: daar horen geen bedragen te staan.
+  await N.setNotificationChannelAsync('default', {
+    name: 'Meridian', importance: N.AndroidImportance.HIGH, lightColor: '#D9BC82',
+    lockscreenVisibility: N.AndroidNotificationVisibility.PRIVATE,
+  });
   let { status } = await N.getPermissionsAsync();
   if (status !== 'granted') status = (await N.requestPermissionsAsync()).status;
   if (status !== 'granted') throw new Error('Geen toestemming. Zet meldingen aan bij Android-instellingen → Apps → Meridian.');
