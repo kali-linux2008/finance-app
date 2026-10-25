@@ -343,7 +343,7 @@ a{color:#3B5BDB}a:hover{color:#2B46B0}
     </div>
   </div>
   <div style="margin:12px 16px 0;padding:20px;background:var(--surfaceGrad);border-radius:20px;box-shadow:inset 0 0 0 1px var(--line)">
-    <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-weight:700;font-size:16px">Noodbuffer</div><div style="font-size:13px;color:var(--muted)">ING Oranje Spaarrekening</div></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-weight:700;font-size:16px">Noodbuffer</div><div style="font-size:13px;color:var(--muted)">Rabo Spaarrekening</div></div>
     <div style="display:flex;align-items:baseline;gap:8px;margin-top:10px;font-variant-numeric:tabular-nums"><span style="font-family:'Source Serif 4',serif;font-size:28px;color:var(--gold)">{{ goals.bufV }}</span><span style="font-size:14px;color:var(--muted)">van € 15.000</span></div>
     <div style="height:8px;background:var(--surface2);border-radius:4px;margin-top:12px;overflow:hidden"><div style="width:{{ goals.bufW }}%;height:100%;background:var(--pos);border-radius:4px"></div></div>
     <div style="font-size:12px;color:var(--muted);margin-top:10px">Nog € 2.600 · bij € 200 per maand vol in nov 2027</div>
@@ -1276,8 +1276,8 @@ const POS=[
  {id:'btc',tk:'BTC',name:'Bitcoin',cls:'Crypto',cat:'cr',src:'Trezor Safe 5 · OKX',qty:.1452,u:'BTC',price:91810,cur:'EUR',value:13331,cost:9870,fees:'€ 4,12',r:[-.52,3.4,-4.4,41,35],tile:2,trade:'OKX',sellMax:3461,wallets:[{n:'Trezor Safe 5',q:'0,1075 BTC',v:9870,icon:'lock',note:'Cold storage · alleen-lezen'},{n:'OKX',q:'0,0377 BTC',v:3461,icon:'currency_exchange',note:'Exchange · handelen via API'}]},
  {id:'eth',tk:'ETH',name:'Ethereum',cls:'Crypto',cat:'cr',src:'OKX',qty:.82,u:'ETH',price:2480,cur:'EUR',value:2034,cost:2210,fees:'€ 1,90',r:[-.31,2.1,-6.2,-8,-8],tile:2,trade:'OKX'},
  {id:'sol',tk:'SOL',name:'Solana',cls:'Crypto',cat:'cr',src:'OKX',qty:4.3,u:'SOL',price:145.30,cur:'EUR',value:625,cost:520,fees:'€ 0,58',r:[1.12,4.8,-2.9,18,20],tile:2,trade:'OKX'},
- {id:'spaar',tk:'ING',name:'Oranje Spaarrekening',cls:'Cash',cat:'cash',src:'ING',value:12400,tile:3,rate:'2,25% rente',note:'Rente wordt maandelijks bijgeschreven. Deze rekening is gekoppeld aan je doel Noodbuffer.'},
- {id:'betaal',tk:'ING',name:'Betaalrekening',cls:'Cash',cat:'cash',src:'ING',value:2850,tile:4,note:'Saldo via PSD2-koppeling, elk uur bijgewerkt.'},
+ {id:'spaar',tk:'RABO',name:'Rabo Spaarrekening',cls:'Cash',cat:'cash',src:'Rabobank',value:12400,tile:3,rate:'2,25% rente',note:'Rente wordt maandelijks bijgeschreven. Deze rekening is gekoppeld aan je doel Noodbuffer.'},
+ {id:'betaal',tk:'RABO',name:'Betaalrekening',cls:'Cash',cat:'cash',src:'Rabobank',value:2850,tile:4,note:'Saldo via PSD2-koppeling, elk uur bijgewerkt.'},
  {id:'goud',tk:'XAU',name:'Goud · 22 g',cls:'Goud',cat:'gold',src:'Handmatig',qty:22,u:'g',price:88.64,cur:'EUR',value:1950,cost:1620,fees:'—',r:[.3,.9,3.1,28,20],tile:5,manual:true,note:'Fysiek goud, handmatig ingevoerd. Waarde volgt de spotprijs.'}
 ];
 const TOTAL=64830.42;
@@ -1285,23 +1285,23 @@ const TILE={1:['var(--t1)','var(--t1i)'],2:['var(--t2)','var(--t2i)'],3:['var(--
 const TX=[
  {m:'Oktober 2026',d:'15 okt',t:'Koop VWCE',s:'Trading 212 · periodiek · 1,56 st',a:-200,k:'Kopen',i:'add',tk:'VWCE'},
  {m:'Oktober 2026',d:'12 okt',t:'Koop BTC',s:'OKX · periodiek · 0,00207 BTC',a:-190,k:'Kopen',i:'add',fee:'€ 0,19 kosten',tk:'BTC'},
- {m:'Oktober 2026',d:'10 okt',t:'Storting Trading 212',s:'ING → Trading 212',a:650,k:'Overboekingen',i:'sync_alt'},
+ {m:'Oktober 2026',d:'10 okt',t:'Storting Trading 212',s:'Rabobank → Trading 212',a:650,k:'Overboekingen',i:'sync_alt'},
  {m:'Oktober 2026',d:'3 okt',t:'Verkoop SOL',s:'OKX · 1,2 SOL à € 151,10',a:181.32,k:'Verkopen',i:'remove',fee:'€ 0,18 kosten',tk:'SOL'},
- {m:'Oktober 2026',d:'1 okt',t:'Rente spaarrekening',s:'ING · 2,25%',a:23.18,k:'Rente',i:'savings'},
+ {m:'Oktober 2026',d:'1 okt',t:'Rente spaarrekening',s:'Rabobank · 2,25%',a:23.18,k:'Rente',i:'savings'},
  {m:'September 2026',d:'29 sep',t:'Dividend VWCE',s:'Trading 212 · 142,3 st',a:70.10,k:'Dividend',i:'payments',tk:'VWCE'},
  {m:'September 2026',d:'25 sep',t:'Koop ASML',s:'Trading 212 · 1 st à € 688,40',a:-688.40,k:'Kopen',i:'add',tk:'ASML'},
  {m:'September 2026',d:'15 sep',t:'Koop VWCE',s:'Trading 212 · periodiek · 1,59 st',a:-200,k:'Kopen',i:'add',tk:'VWCE'},
  {m:'September 2026',d:'12 sep',t:'Koop BTC',s:'OKX · periodiek · 0,00212 BTC',a:-190,k:'Kopen',i:'add',fee:'€ 0,19 kosten',tk:'BTC'},
- {m:'September 2026',d:'10 sep',t:'Storting Trading 212',s:'ING → Trading 212',a:650,k:'Overboekingen',i:'sync_alt'},
+ {m:'September 2026',d:'10 sep',t:'Storting Trading 212',s:'Rabobank → Trading 212',a:650,k:'Overboekingen',i:'sync_alt'},
  {m:'September 2026',d:'2 sep',t:'Opname naar Trezor',s:'OKX → Trezor Safe 5 · 0,02 BTC',a:0,k:'Overboekingen',i:'lock',fee:'€ 1,10 netwerk',tk:'BTC'},
- {m:'September 2026',d:'1 sep',t:'Rente spaarrekening',s:'ING · 2,25%',a:22.94,k:'Rente',i:'savings'},
+ {m:'September 2026',d:'1 sep',t:'Rente spaarrekening',s:'Rabobank · 2,25%',a:22.94,k:'Rente',i:'savings'},
  {m:'Augustus 2026',d:'14 aug',t:'Dividend AAPL',s:'$ 4,68 bruto · 15% bronbelasting',a:3.41,k:'Dividend',i:'payments',tk:'AAPL'},
  {m:'Augustus 2026',d:'7 aug',t:'Dividend ASML',s:'Trading 212 · € 1,60 per aandeel',a:11.20,k:'Dividend',i:'payments',tk:'ASML'}
 ];
 const BARS=[['nov',16,23],['dec',64,23],['jan',0,23],['feb',16,23],['mrt',66,23],['apr',0,23],['mei',16,23],['jun',68,23],['jul',0,23],['aug',15,23],['sep',70,23],['okt',0,23]];
 const SOURCES=[
  {id:'t212',name:'Trading 212',icon:'candlestick_chart',how:'API-sleutel · lezen + orders',sync:'2 min',value:31640,chg:.82,steps:['Open Trading 212 → Instellingen → API (bèta).','Maak een sleutel met rechten “Account lezen” en “Orders”.','Plak de sleutel hieronder.'],ph:'API-sleutel'},
- {id:'ing',name:'ING',icon:'account_balance',how:'PSD2-bankkoppeling · verloopt over 63 dagen',sync:'1 uur',value:15250,sub:'2,25% rente',steps:['Je wordt doorgestuurd naar de ING-app.','Kies de rekeningen die je wilt delen.','Toestemming is 180 dagen geldig; we herinneren je op tijd.']},
+ {id:'rabo',name:'Rabobank',icon:'account_balance',how:'PSD2-bankkoppeling · verloopt over 63 dagen',sync:'1 uur',value:15250,sub:'2,25% rente',steps:['Je wordt doorgestuurd naar de Rabo-app.','Kies de rekeningen die je wilt delen.','Toestemming is 180 dagen geldig; we herinneren je op tijd.']},
  {id:'trezor',name:'Trezor Safe 5',icon:'lock',how:'Publieke sleutel (xpub) · alleen-lezen',sync:'5 min',value:9870,chg:-.52,steps:['Open Trezor Suite en kies je Bitcoin-account.','Ga naar Details → Toon publieke sleutel en bevestig op je Trezor.','Scan de QR-code of plak de xpub. Je seed verlaat nooit je apparaat.'],ph:'xpub6CUGRU…'},
  {id:'okx',name:'OKX',icon:'currency_exchange',how:'API-sleutel · lezen + handelen, geen opnames',sync:'2 min',value:6120,chg:-.24,steps:['Open OKX → Profiel → API → Maak API-sleutel.','Zet alleen “Lezen” en “Handelen” aan. Nooit “Opnemen”.','Plak sleutel, secret en passphrase.'],ph:'API-sleutel'},
  {id:'man',name:'Handmatig',icon:'edit_note',how:'Goud, pensioen ABP, woning',sync:'3 dgn',value:1950,sub:'goud · 22 g',steps:['Voeg bezittingen toe die niet te koppelen zijn.','Pensioen: importeer je UPO van mijnpensioenoverzicht.nl.','Woning: WOZ-waarde en hypotheek voor je overwaarde.']}
@@ -1328,14 +1328,14 @@ const PLANS=[
  {id:'p3',pos:'eth',tk:'ETH',name:'Ethereum',via:'OKX',base:25,hf:'Wekelijks',day:'maandag',next:'12 nov',ord:3,dom:12,start:2900,end:2480,u:'ETH',seed:19,vol:.04}
 ];
 const DEV=[
- {y:2026,m:9,d:1,tk:'ING',name:'Rente spaarrekening',v:23.18,st:'Ontvangen',kind:'rente'},
- {y:2026,m:10,d:1,tk:'ING',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
+ {y:2026,m:9,d:1,tk:'RABO',name:'Rente spaarrekening',v:23.18,st:'Ontvangen',kind:'rente'},
+ {y:2026,m:10,d:1,tk:'RABO',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
  {y:2026,m:10,d:6,tk:'ASML',name:'ASML Holding',ex:'28 okt',v:11.20,st:'Aangekondigd',kind:'div',pos:'asml'},
  {y:2026,m:10,d:13,tk:'AAPL',name:'Apple',ex:'10 nov',v:3.40,st:'Aangekondigd',kind:'div',pos:'aapl'},
- {y:2026,m:11,d:1,tk:'ING',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
+ {y:2026,m:11,d:1,tk:'RABO',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
  {y:2026,m:11,d:24,tk:'VWCE',name:'Vanguard FTSE All-World',ex:'11 dec',v:71,st:'Verwacht',kind:'div',pos:'vwce'},
- {y:2027,m:0,d:1,tk:'ING',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
- {y:2027,m:1,d:1,tk:'ING',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
+ {y:2027,m:0,d:1,tk:'RABO',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
+ {y:2027,m:1,d:1,tk:'RABO',name:'Rente spaarrekening',v:23,st:'Verwacht',kind:'rente'},
  {y:2027,m:1,d:5,tk:'ASML',name:'ASML Holding',ex:'28 jan',v:11.20,st:'Verwacht',kind:'div',pos:'asml'},
  {y:2027,m:1,d:12,tk:'AAPL',name:'Apple',ex:'9 feb',v:3.40,st:'Verwacht',kind:'div',pos:'aapl'}
 ];
@@ -1418,7 +1418,7 @@ class Component extends DCLogic {
     let groups;
     if(S.pfGroup==='cat'){groups=[['eq',"Aandelen & ETF's"],['cr','Crypto'],['cash','Cash'],['gold','Goud']].map(([c,n])=>{const ps=POS.filter(p=>p.cat===c&&flt(p));return{name:n,sub:M(ps.reduce((a,p)=>a+p.value,0)),rows:ps.map(p=>rowOf(p))};}).filter(x=>x.rows.length);}
     else{const P2=id=>POS.find(p=>p.id===id);const btc=P2('btc');
-      const def=[['Trading 212',['vwce','sxr8','asml','aapl'].map(i=>[P2(i)])],['OKX',[[btc,{name:'Bitcoin',sub:'0,0377 BTC · OKX',value:3461}],[P2('eth')],[P2('sol')]]],['Trezor Safe 5',[[btc,{name:'Bitcoin',sub:'0,1075 BTC · cold storage',value:9870}]]],['ING',[[P2('spaar')],[P2('betaal')]]],['Handmatig',[[P2('goud')]]]];
+      const def=[['Trading 212',['vwce','sxr8','asml','aapl'].map(i=>[P2(i)])],['OKX',[[btc,{name:'Bitcoin',sub:'0,0377 BTC · OKX',value:3461}],[P2('eth')],[P2('sol')]]],['Trezor Safe 5',[[btc,{name:'Bitcoin',sub:'0,1075 BTC · cold storage',value:9870}]]],['Rabobank',[[P2('spaar')],[P2('betaal')]]],['Handmatig',[[P2('goud')]]]];
       groups=def.map(([n,list])=>{const l=list.filter(([p])=>flt(p));return{name:n,sub:M(l.reduce((a,[p,ov])=>a+(ov?ov.value:p.value),0)),rows:l.map(([p,ov])=>rowOf(p,ov))};}).filter(x=>x.rows.length);}
     let _k=0;groups.forEach(gg=>gg.rows.forEach(r=>{r.dl=Math.min(_k++,12)*35;}));
     const seg=(on)=>({ring:on?'var(--goldRing)':'none',bg:on?'var(--surface)':'transparent',color:on?'var(--ink)':'var(--muted)'});
@@ -1499,7 +1499,7 @@ class Component extends DCLogic {
     // income
     const divT=BARS.reduce((a,b)=>a+b[1],0),renT=BARS.reduce((a,b)=>a+b[2],0);
     const inc={total:M(divT+renT),div:M(divT),rente:M(renT),bars:BARS.map(([mm,dv,rn])=>({m:mm,dh:Math.round(dv*1.1),rh:Math.round(rn*1.1)})),
-      upcoming:[{t:'Rente ING',s:'1 nov · Oranje Spaarrekening',v:priv?'••••':'~€ 23'},{t:'ASML',s:'~6 nov · 7 aandelen',v:priv?'••••':'~€ 11'},{t:'Apple',s:'~13 nov · na 15% bronbelasting',v:priv?'••••':'~€ 3,40'},{t:'VWCE',s:'~24 dec · 142,3 stuks',v:priv?'••••':'~€ 71'}]};
+      upcoming:[{t:'Rente Rabobank',s:'1 nov · Rabo Spaarrekening',v:priv?'••••':'~€ 23'},{t:'ASML',s:'~6 nov · 7 aandelen',v:priv?'••••':'~€ 11'},{t:'Apple',s:'~13 nov · na 15% bronbelasting',v:priv?'••••':'~€ 3,40'},{t:'VWCE',s:'~24 dec · 142,3 stuks',v:priv?'••••':'~€ 71'}]};
 
     // insights
     const part=(name,val,bg)=>({name,v:M(val),p:pp(val/TOTAL*100),w:val,bg});
@@ -1514,7 +1514,7 @@ class Component extends DCLogic {
     const box3={tax:priv?'••••':'≈ € 22',newTax:priv?'••••':'≈ € 1.598',base:M(58900),free:'€ 57.684'};
 
     // sources
-    const srcList={connected:SOURCES.map(s=>({name:s.name,icon:s.icon,how:s.how,sync:s.sync,dot:s.id==='ing'?'#C9A15A':'var(--pos)',open:openConn(s)})),add:ADD.map(s=>({...s,open:()=>this.setState({conn:{...s,connected:false}})}))};
+    const srcList={connected:SOURCES.map(s=>({name:s.name,icon:s.icon,how:s.how,sync:s.sync,dot:s.id==='rabo'?'#C9A15A':'var(--pos)',open:openConn(s)})),add:ADD.map(s=>({...s,open:()=>this.setState({conn:{...s,connected:false}})}))};
     const C=S.conn;const cn={open:!!C};
     if(C)Object.assign(cn,{name:C.name,icon:C.icon,how:C.how,steps:(C.steps||[]).map((t,i)=>({n:i+1,t})),hasField:!C.connected&&!!C.ph,ph:C.ph||'',scan:()=>this.say('Camera openen om QR te scannen'),
       close:()=>this.setState({conn:null}),priLabel:C.connected?'Nu synchroniseren':'Koppelen',secLabel:C.connected?'Ontkoppelen':'Annuleren',
@@ -1569,7 +1569,7 @@ class Component extends DCLogic {
       bioOn:S.obBio===true,bioOff:S.obBio!==true,bio:()=>{if(S.obBio)return;this.setState({obBio:true});setTimeout(()=>this.setState({ob:4}),800);},
       curs:[['EUR','Euro','Aanbevolen · Box 3 rekent in euro'],['USD','Amerikaanse dollar','Handig als je vooral in VS belegt']].map(([c,k,s2])=>({k:c+' · '+k,s:s2,ring:S.obCur===c?'var(--gold)':'var(--faint)',dot:S.obCur===c?'var(--gold)':'transparent',pick:()=>this.setState({obCur:c})})),
       b3Bg:tg(S.obBox3).bg,b3Knob:tg(S.obBox3).knob,toggleBox3:()=>this.setState({obBox3:!S.obBox3}),
-      conns:[['t212','Trading 212','candlestick_chart','API-sleutel'],['ing','ING','account_balance','PSD2-bankkoppeling'],['okx','OKX','currency_exchange','API · lezen + handelen'],['trezor','Trezor Safe 5','lock','xpub · alleen-lezen'],['man','Handmatig','edit_note','Goud, pensioen, woning']].map(([id,n,ic,how])=>{const st=S.obConn[id];
+      conns:[['t212','Trading 212','candlestick_chart','API-sleutel'],['rabo','Rabobank','account_balance','PSD2-bankkoppeling'],['okx','OKX','currency_exchange','API · lezen + handelen'],['trezor','Trezor Safe 5','lock','xpub · alleen-lezen'],['man','Handmatig','edit_note','Goud, pensioen, woning']].map(([id,n,ic,how])=>{const st=S.obConn[id];
         return{name:n,icon:ic,how,label:st==='done'?'Gekoppeld':st==='busy'?'Bezig':'Koppel',bg:st==='done'?'transparent':st==='busy'?'var(--surface2)':'var(--accent)',fg:st==='done'?'var(--pos)':st==='busy'?'var(--muted)':'var(--onAccent)',bd:st==='done'?'var(--line)':st==='busy'?'var(--surface2)':'var(--accent)',
           stIcon:st==='done'?'check':'progress_activity',iconDisp:st?'inline-block':'none',spin:st==='busy'?'spin 1s linear infinite':'none',
           press:()=>{if(st)return;this.setState(s=>({obConn:{...s.obConn,[id]:'busy'}}));setTimeout(()=>this.setState(s=>({obConn:{...s.obConn,[id]:'done'}})),1100);}};}),
@@ -1675,8 +1675,8 @@ class Component extends DCLogic {
     if(btcS>1)rst.push(ordStep('sb','Verkopen','BTC','Bitcoin','OKX',btcS,'cr','direct'));
     if(ethS>1)rst.push(ordStep('se','Verkopen','ETH','Ethereum','OKX',ethS,'cr','direct'));
     if(df.eq<-1)rst.push(ordStep('sv','Verkopen','VWCE','Vanguard FTSE All-World','Trading 212',-df.eq,'eq','ma 19 okt 09:00'));
-    if(df.cash<-1&&df.eq>1)rst.push({id:'tc',kind:'todo',icon:'sync_alt',t:'Boek '+E(-df.cash)+' over naar Trading 212',s:'ING → Trading 212 · via je bank-app',k1:'Cash daarna',v1:S.rbT.cash+'%',k2:'Waar',v2:'Bank-app ING'});
-    if(df.cash>1)rst.push({id:'tc2',kind:'todo',icon:'savings',t:'Zet '+E(df.cash)+' op je spaarrekening',s:'Na de verkopen · naar ING Oranje Spaarrekening',k1:'Cash daarna',v1:S.rbT.cash+'%',k2:'Waar',v2:'Bank-app'});
+    if(df.cash<-1&&df.eq>1)rst.push({id:'tc',kind:'todo',icon:'sync_alt',t:'Boek '+E(-df.cash)+' over naar Trading 212',s:'Rabobank → Trading 212 · via je bank-app',k1:'Cash daarna',v1:S.rbT.cash+'%',k2:'Waar',v2:'Bank-app Rabobank'});
+    if(df.cash>1)rst.push({id:'tc2',kind:'todo',icon:'savings',t:'Zet '+E(df.cash)+' op je spaarrekening',s:'Na de verkopen · naar Rabo Spaarrekening',k1:'Cash daarna',v1:S.rbT.cash+'%',k2:'Waar',v2:'Bank-app'});
     if(df.eq>1)rst.push(ordStep('bv','Kopen','VWCE','Vanguard FTSE All-World','Trading 212',df.eq,'eq','ma 19 okt 09:00'));
     if(df.cr>1)rst.push(ordStep('bb','Kopen','BTC','Bitcoin','OKX',df.cr,'cr','direct'));
     if(df.gold>1)rst.push({id:'gd',kind:'todo',icon:'edit_note',t:'Koop '+Math.round(df.gold/88.64)+' g goud',s:'Handmatig · daarna waarde bijwerken',k1:'Goud daarna',v1:S.rbT.gold+'%',k2:'Bedrag',v2:E(df.gold)});
@@ -1731,7 +1731,7 @@ class Component extends DCLogic {
     const w1=ser('1D');
     const widget={total:M(TOTAL),day:MS(412.18,2)+' · '+pct(.64)+' vandaag',spark:chart([{arr:w1.pf,show:true}],null,w1.labels).d[0],movers:[{tk:'ASML',c:pct(1.84,1)},{tk:'SOL',c:pct(1.12,1)},{tk:'BTC',c:pct(-.52,1)}]};
 
-    return {wl,dca,dp,ord,dv,rb,pfLinks,goWatch:()=>this.go('watch'),goDca:()=>this.go('dca'),goDivcal:()=>this.go('divcal'),goSearch:()=>this.go('search'),srch,al,rp,ob,loadMsg:'Synchroniseren · Trading 212, ING, OKX, Trezor',theme,isDark:theme==='dark',jumps,locked,pinDots,lockKeys,scr,showNav:onTab,nav,
+    return {wl,dca,dp,ord,dv,rb,pfLinks,goWatch:()=>this.go('watch'),goDca:()=>this.go('dca'),goDivcal:()=>this.go('divcal'),goSearch:()=>this.go('search'),srch,al,rp,ob,loadMsg:'Synchroniseren · Trading 212, Rabobank, OKX, Trezor',theme,isDark:theme==='dark',jumps,locked,pinDots,lockKeys,scr,showNav:onTab,nav,
       privIcon:priv?'visibility_off':'visibility',togglePriv:()=>this.setState({privacy:!priv}),
       goNotif:()=>this.go('notifications'),goMore:()=>this.go('more'),goInsights:()=>this.go('insights'),goSources:()=>this.go('sources'),goGoals:()=>this.tab('goals'),
       hero,hc,periods,bench,toggleSp:()=>this.setState({sp:!S.sp}),toggleBt:()=>this.setState({bt:!S.bt}),

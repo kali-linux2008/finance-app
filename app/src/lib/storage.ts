@@ -27,4 +27,6 @@ export const KEYS = {
   notify: 'meridian.notify',
   lastEvent: 'meridian.lastEvent',
   seenEvent: 'meridian.seenEvent',
+  privacy: 'meridian.privacy',
+  widget: 'meridian.widget',
 };

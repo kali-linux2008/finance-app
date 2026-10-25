@@ -1,7 +1,7 @@
 # Handoff: Meridian — persoonlijk vermogens- en beleggingsdashboard (Android)
 
 ## Overview
-Mobiele app (Android, Nederlands) voor een actieve particuliere belegger (persona: Joris, 26 jaar, ± € 65k belegd + gespaard). De app bundelt Trading 212, OKX, Trezor Safe 5 (alleen-lezen via xpub), ING (PSD2) en handmatige bezittingen (goud, pensioen ABP, woning/hypotheek) in één overzicht in EUR, en laat handelen toe via Trading 212 (aandelen/ETF) en OKX (crypto), inclusief limietorders en periodiek inleggen.
+Mobiele app (Android, Nederlands) voor een actieve particuliere belegger (persona: Joris, 26 jaar, ± € 65k belegd + gespaard). De app bundelt Trading 212, OKX, Trezor Safe 5 (alleen-lezen via xpub), Rabobank (PSD2) en handmatige bezittingen (goud, pensioen ABP, woning/hypotheek) in één overzicht in EUR, en laat handelen toe via Trading 212 (aandelen/ETF) en OKX (crypto), inclusief limietorders en periodiek inleggen.
 
 ## About the Design Files
 De bestanden in deze bundel zijn **designreferenties gemaakt in HTML**: prototypes die het beoogde uiterlijk en gedrag tonen, geen productiecode. De opdracht is om deze ontwerpen **opnieuw te bouwen in de doelomgeving** (bijv. Jetpack Compose, React Native of Flutter) met de daar gebruikelijke patronen. Is er nog geen codebase, kies dan het meest passende framework; voor een Android-first app met native biometrie ligt Jetpack Compose (Material 3) voor de hand.
@@ -69,7 +69,7 @@ Zwevende navigatiebalk (64px hoog, radius 32, 12px van de randen, 16px van onder
 
 ## Screens / Views
 1. **Vergrendelscherm**: heroBg, titel "Meridian" in champagne, 5 pin-dots (gouden rand), keypad 72px-cirkels, vingerafdruk links onder. Na ontgrendelen volgt het laadscherm.
-2. **Laadscherm**: skeletons met shimmer (1,3s lineair) in de vorm van het overzicht, en de regel "Synchroniseren · Trading 212, ING, OKX, Trezor". Duurt ± 1,5s.
+2. **Laadscherm**: skeletons met shimmer (1,3s lineair) in de vorm van het overzicht, en de regel "Synchroniseren · Trading 212, Rabobank, OKX, Trezor". Duurt ± 1,5s.
 3. **Overzicht**: begroeting + datum; iconen privacy (oog), zoeken, meldingen (met stip), avatar. Hero met belegd vermogen, delta-pill, grafiek (120px) met S&P 500- en Bitcoin-vergelijking (aan/uit), periodes 1D/1W/1M/1J/Alles (standaard Alles, actieve chip goud). **Scrubben**: slepen over de grafiek toont de waarde op dat moment in de hero. Daaronder: strip met Vandaag / Rendement (IRR, TWR of simpel) / Kosten; treemap "Waar het staat"; bronnentegels (2×2); doelen (FIRE € 500k, noodbuffer € 15k); pensioen + overwaarde (buiten belegd vermogen); Box 3-schatting.
 4. **Portefeuille**: totaal in goud; drie snelkoppelingen (Orders, Periodiek, Balans; gouden stip bij aandacht nodig); segmenten Categorie/Bron en Dag/Totaal; filterchips; gegroepeerde posities; volglijst-carrousel; "Buiten belegd vermogen".
 5. **Detail belegging**: prijs in goud, scrubbare grafiek, positie-stats (2-koloms grid), per bewaarplek (BTC: Trezor/OKX), dividend, transacties, onderbalk Verkopen/Kopen. Knop rechtsboven opent de koersalert.
