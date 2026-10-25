@@ -1,6 +1,6 @@
 # Meldingen
 
-Meridian laat je dingen weten, zoals of je periodieke inleg gelukt is. Alles blijft lokaal: de app haalt de meldingen zelf op bij je eigen server. Geen Google, geen Expo-account, geen andere app.
+Meridian laat je dingen weten: of je periodieke inleg gelukt is, een koersalert die afgaat (zie [SERVER.md](SERVER.md), stap 9) en een nieuwe app-versie. Alles blijft lokaal: de app haalt de meldingen zelf op bij je eigen server. Geen Google, geen Expo-account, geen andere app.
 
 - **In de app:** het belletje rechtsboven op Overzicht, met een stip als er iets nieuws is.
 - **Als melding op je telefoon:** zet ze aan via **JV → Meldingen**.

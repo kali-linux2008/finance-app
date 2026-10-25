@@ -137,3 +137,35 @@ export type AppBuild = { versionCode: number; version: string; built: number | n
 
 export const getAppBuild = async (cfg: ServerConfig) =>
   (await request<{ available: AppBuild | null }>(`${cfg.url}/api/app`, auth(cfg), 10000)).available;
+
+// Koersalerts en volglijst (eigen bezit en crypto via OKX)
+export type PriceAlert = {
+  id: string; key: string; tk: string; name: string; cur: string;
+  dir: 'boven' | 'onder'; price: number; repeat: boolean; created: number; armed?: boolean;
+};
+export type PriceQuote = { key: string; tk: string; name: string; price: number; cur: string; chg: number | null; cat?: string; alerts: PriceAlert[] };
+export type WatchItem = { key: string; tk: string; name: string; cat?: string; price: number | null; cur: string | null; chg: number | null; spark: number[] | null };
+export type WatchState = { items: WatchItem[]; alerts: PriceAlert[] };
+export type SearchResult = { key: string; tk: string; name: string; cat: string; own: boolean };
+
+export const getQuote = (cfg: ServerConfig, key: string) =>
+  request<PriceQuote>(`${cfg.url}/api/koers?key=${encodeURIComponent(key)}`, auth(cfg), 30000);
+
+export const getAlerts = async (cfg: ServerConfig) =>
+  (await request<{ alerts: PriceAlert[] }>(`${cfg.url}/api/alerts`, auth(cfg))).alerts;
+
+export const addAlert = (cfg: ServerConfig, a: { key: string; dir: 'boven' | 'onder'; price: number; repeat: boolean }) =>
+  request<{ alert: PriceAlert; alerts: PriceAlert[] }>(`${cfg.url}/api/alerts`, post(cfg, a), 30000);
+
+export const removeAlert = async (cfg: ServerConfig, id: string) =>
+  (await request<{ alerts: PriceAlert[] }>(`${cfg.url}/api/alerts/verwijder`, post(cfg, { id }))).alerts;
+
+export const getWatch = (cfg: ServerConfig) => request<WatchState>(`${cfg.url}/api/volglijst`, auth(cfg), 30000);
+
+export const addWatch = (cfg: ServerConfig, key: string) => request<WatchState>(`${cfg.url}/api/volglijst`, post(cfg, { key }), 30000);
+
+export const removeWatch = (cfg: ServerConfig, key: string) =>
+  request<WatchState>(`${cfg.url}/api/volglijst/verwijder`, post(cfg, { key }), 30000);
+
+export const searchInstruments = async (cfg: ServerConfig, q: string) =>
+  (await request<{ results: SearchResult[] }>(`${cfg.url}/api/zoek?q=${encodeURIComponent(q)}`, auth(cfg), 20000)).results;

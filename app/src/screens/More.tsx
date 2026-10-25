@@ -1,11 +1,12 @@
 // Meer: profiel, links naar de overige schermen en de schakelaars (thema, privacy, vingerafdruk).
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '../components/Icon';
 import { ScreenIn } from '../components/motion';
 import { T } from '../components/T';
+import { ToggleRow } from '../components/Toggle';
 import { UpdateRow } from '../components/UpdateCard';
 import { Card, IconButton } from '../components/ui';
 import { OPEN_ORDERS } from '../data/sample';
@@ -15,16 +16,18 @@ import { useApp, useColors } from '../state/app';
 import { useData } from '../state/data';
 import { useLock } from '../state/lock';
 
-const ROWS: [IconName, string, string][] = [
-  ['pending_actions', 'Lopende orders', `${OPEN_ORDERS} open`],
-  ['autorenew', 'Periodiek inleggen', 'Plannen, pauzeren, historie'],
+// Vierde waarde: het scherm dat al bestaat; zonder route volgt het in een latere stap.
+const ROWS: [IconName, string, string, string?][] = [
+  ['pending_actions', 'Lopende orders', `${OPEN_ORDERS} open`, '/orders'],
+  ['autorenew', 'Periodiek inleggen', 'Plannen, pauzeren, historie', '/periodiek'],
+  ['star', 'Volglijst', 'Koersen volgen en koersalerts', '/volglijst'],
   ['balance', 'Herbalanceren', 'Doel vs. nu'],
   ['calendar_month', 'Dividendkalender', 'Ex- en uitbetaaldata'],
   ['summarize', 'Rapporten', 'Maand- en jaaroverzicht'],
   ['insights', 'Inzichten & allocatie', 'Regio, valuta, kosten, Box 3'],
   ['payments', 'Inkomen & dividend', 'Afgelopen 12 maanden'],
   ['link', 'Bronnen', '5 gekoppeld'],
-  ['notifications', 'Meldingen', '4 typen aan'],
+  ['notifications', 'Meldingen', 'Alle meldingen van je server', '/meldingen'],
 ];
 
 export function More() {
@@ -84,8 +87,8 @@ export function More() {
             <Icon name="chevron_right" size={20} color={c.faint} />
           </Pressable>
           <UpdateRow />
-          {ROWS.map(([icon, label, sub]) => (
-            <Pressable key={label} onPress={soon} style={{ flexDirection: 'row', gap: 16, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
+          {ROWS.map(([icon, label, sub, route]) => (
+            <Pressable key={label} onPress={route ? () => router.push(route as never) : soon} style={{ flexDirection: 'row', gap: 16, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
               <Icon name={icon} size={22} color={c.muted} />
               <View style={{ flex: 1 }}>
                 <T size={15} w={600}>{label}</T>
@@ -119,24 +122,5 @@ export function More() {
         </Pressable>
       </ScrollView>
     </ScreenIn>
-  );
-}
-
-function ToggleRow({ label, sub, on, onToggle }: { label: string; sub: string; on: boolean; onToggle: () => void }) {
-  const c = useColors();
-  const [k] = useState(() => new Animated.Value(on ? 1 : 0));
-  useEffect(() => {
-    Animated.timing(k, { toValue: on ? 1 : 0, duration: 200, easing: Easing.bezier(0.3, 0.7, 0.2, 1.3), useNativeDriver: true }).start();
-  }, [on, k]);
-  return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
-      <View style={{ flex: 1 }}>
-        <T size={15} w={600}>{label}</T>
-        <T size={12} color={c.muted} style={{ marginTop: 2 }}>{sub}</T>
-      </View>
-      <Pressable onPress={onToggle} accessibilityRole="switch" accessibilityState={{ checked: on }} style={{ width: 52, height: 32, borderRadius: 16, backgroundColor: on ? c.accent : c.faint }}>
-        <Animated.View style={{ position: 'absolute', top: 4, left: 4, width: 24, height: 24, borderRadius: 12, backgroundColor: '#FFFFFF', transform: [{ translateX: k.interpolate({ inputRange: [0, 1], outputRange: [0, 20] }) }] }} />
-      </Pressable>
-    </View>
   );
 }

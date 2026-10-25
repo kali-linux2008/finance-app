@@ -11,6 +11,7 @@ import { T } from '../components/T';
 import { Button, Card, IconButton, Segmented } from '../components/ui';
 import { TRANSACTIONS } from '../data/sample';
 import { getCandles, type Point } from '../lib/api';
+import { keyFor } from '../lib/watch';
 import { currencyPrefix, num, pct, signedEur } from '../lib/format';
 import { positionStats } from '../lib/position';
 import { PER, PERIODS, portfolioSeries, positionSeries, type Period } from '../lib/series';
@@ -101,7 +102,11 @@ export function Detail({ id }: { id: string }) {
         <T size={16} w={700} style={{ flex: 1, marginLeft: 4 }}>{pos.tk}</T>
         <IconButton
           name="notification_add"
-          onPress={() => say(pos.price ? 'Koersalerts komen in een volgende stap' : 'Alerts zijn er voor koersen, niet voor saldi')}
+          onPress={() => {
+            if (!pos.price) say('Alerts zijn er voor koersen, niet voor saldi');
+            else if (!live) say('Koppel eerst je server om koersalerts te gebruiken');
+            else router.push({ pathname: '/alert', params: { key: keyFor(pos) } });
+          }}
         />
       </View>
 
