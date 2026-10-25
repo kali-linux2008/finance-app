@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, appupdate, auth, config, notify, plans, portfolio, prices, trading
+from . import __version__, alerts, appupdate, auth, config, notify, plans, portfolio, prices, trading
 from .store import Store
 
 state: dict = {}
@@ -24,7 +24,8 @@ async def lifespan(app: FastAPI):
     state.setdefault("store", Store())
     state["client"] = httpx.AsyncClient(timeout=15, headers={"User-Agent": f"meridian/{__version__}"})
     tasks = [asyncio.create_task(plans.loop(state["store"], state["client"])),  # periodiek inleggen
-             asyncio.create_task(appupdate.loop(state["store"]))]  # nieuwe app-versie melden
+             asyncio.create_task(appupdate.loop(state["store"])),  # nieuwe app-versie melden
+             asyncio.create_task(alerts.loop(state["store"], state["client"]))]  # koersalerts
     yield
     for t in tasks:
         t.cancel()
@@ -220,6 +221,80 @@ async def put_plan(body: PlanBody, s: Store = Depends(store), c: httpx.AsyncClie
 @app.get("/api/meldingen", dependencies=[Depends(device)])
 def get_events(na: int = 0, s: Store = Depends(store)) -> dict:
     return {"events": notify.events(s, na)}
+
+
+# Koersalerts en volglijst (alleen eigen bezit en crypto via OKX).
+
+class AlertBody(BaseModel):
+    key: str
+    dir: Literal["boven", "onder"]
+    price: float
+    repeat: bool = False
+
+
+class KeyBody(BaseModel):
+    key: str
+
+
+class IdBody(BaseModel):
+    id: str
+
+
+def _alert_error(e: alerts.AlertError) -> HTTPException:
+    return HTTPException(400, str(e))
+
+
+@app.get("/api/koers", dependencies=[Depends(device)])
+async def get_quote(key: str, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    q = (await alerts.quotes(s, c, [key])).get(key)
+    if not q:
+        raise HTTPException(404, "Geen koers gevonden voor deze belegging.")
+    return {**q, "alerts": [a for a in alerts.get_alerts(s) if a["key"] == key]}
+
+
+@app.get("/api/alerts", dependencies=[Depends(device)])
+def get_alerts(s: Store = Depends(store)) -> dict:
+    return {"alerts": alerts.get_alerts(s)}
+
+
+@app.post("/api/alerts", dependencies=[Depends(device)])
+async def post_alert(body: AlertBody, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    try:
+        alert = await alerts.add_alert(s, c, body.model_dump())
+    except alerts.AlertError as e:
+        raise _alert_error(e) from e
+    return {"alert": alert, "alerts": alerts.get_alerts(s)}
+
+
+@app.post("/api/alerts/verwijder", dependencies=[Depends(device)])
+def delete_alert(body: IdBody, s: Store = Depends(store)) -> dict:
+    alerts.remove_alert(s, body.id)
+    return {"alerts": alerts.get_alerts(s)}
+
+
+@app.get("/api/volglijst", dependencies=[Depends(device)])
+async def get_watch(s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    return await alerts.watch_state(s, c)
+
+
+@app.post("/api/volglijst", dependencies=[Depends(device)])
+async def post_watch(body: KeyBody, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    try:
+        await alerts.add_watch(s, c, body.key)
+    except alerts.AlertError as e:
+        raise _alert_error(e) from e
+    return await alerts.watch_state(s, c)
+
+
+@app.post("/api/volglijst/verwijder", dependencies=[Depends(device)])
+async def delete_watch(body: KeyBody, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    alerts.remove_watch(s, body.key)
+    return await alerts.watch_state(s, c)
+
+
+@app.get("/api/zoek", dependencies=[Depends(device)])
+async def search(q: str = "", s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    return {"results": await alerts.search(s, c, q[:40])}
 
 
 # App-updates: de nieuwste APK die op de server is gebouwd.

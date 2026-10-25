@@ -217,6 +217,17 @@ Na elke inleg krijg je een melding in de app (zie [MELDINGEN.md](MELDINGEN.md)).
 
 Lopende limietorders zie je in de app onder **Portefeuille → Orders**. Daar kun je de limiet wijzigen of de order annuleren.
 
+## 9. Koersalerts en volglijst
+
+Een melding als een koers boven of onder een doel komt.
+
+- **Alert maken:** open een belegging en tik rechtsboven op het belletje. Kies **Stijgt boven** of **Daalt onder**, het percentage, en of je **elke keer** een melding wilt.
+- **Volglijst:** **Meer → Volglijst**. Met **+** zoek je een coin of een van je eigen aandelen; tik op een tegel voor een alert. Met het potlood haal je tegels weg.
+
+De server kijkt elke 2 minuten, ook als je telefoon uit staat. De melding komt via de gewone meldingen (zie [MELDINGEN.md](MELDINGEN.md)). Een eenmalige alert gaat daarna uit; een alert "elke keer" gaat pas opnieuw af als de koers eerst 1% terug is geweest, zodat je niet elke 2 minuten een melding krijgt.
+
+Koersen komen alleen van bronnen die Meridian al gebruikt: je eigen posities (Trading 212, OKX) en de openbare koersen van OKX voor crypto. Er gaat niets extra's naar buiten. Daardoor kun je aandelen die je niet hebt (nog) niet volgen, en is er voor aandelen geen koersgrafiek. De koers van een aandeel ververst zolang de beurs open is.
+
 ## Bijwerken
 
 ```bash
