@@ -3,9 +3,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState, Platform } from 'react-native';
 import { DAY_CHANGE, OUTSIDE, POSITIONS, SOURCES, TOTAL, type Outside, type Position, type Source } from '../data/sample';
 import { checkEvents } from '../lib/alerts';
-import { ApiError, checkServer, getEvents, getPortfolio, normalizeUrl, pairDevice, type PortfolioResponse, type ServerConfig, type ServerEvent } from '../lib/api';
+import { ApiError, checkServer, getAppBuild, getEvents, getPortfolio, normalizeUrl, pairDevice, type AppBuild, type PortfolioResponse, type ServerConfig, type ServerEvent } from '../lib/api';
 import { investedAndCost } from '../lib/portfolio';
 import { deleteItem, getItem, KEYS, setItem } from '../lib/storage';
+import { canUpdate, installedVersion, isNewer } from '../lib/update';
 import { useLock } from './lock';
 
 export type Holdings = {
@@ -31,6 +32,8 @@ type DataState = Holdings & {
   events: ServerEvent[];
   unseen: number;
   markSeen: () => void;
+  /** Nieuwere app-versie op de server, of null als deze app de nieuwste is. */
+  update: AppBuild | null;
   pair: (url: string, code: string) => Promise<void>;
   unpair: () => Promise<void>;
 };
@@ -62,6 +65,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const inFlight = useRef(false);
   const [events, setEvents] = useState<ServerEvent[]>([]);
   const [seen, setSeen] = useState(0);
+  const [update, setUpdate] = useState<AppBuild | null>(null);
 
   useEffect(() => {
     getItem(KEYS.server)
@@ -80,6 +84,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       // Meldingen: nieuwe tonen op de telefoon, en de lijst bijwerken voor het belletje.
       await checkEvents(server).catch(() => {});
       setEvents((await getEvents(server).catch(() => [])).slice().reverse());
+      if (canUpdate) {
+        const build = await getAppBuild(server).catch(() => null);
+        setUpdate(isNewer(build, installedVersion()) ? build : null);
+      }
     } catch (e) {
       setError(e instanceof ApiError && e.status === 401
         ? 'De koppeling met je server is verlopen. Koppel opnieuw via Meer → Server.'
@@ -136,8 +144,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DataState>(() => ({
     ...(server ? holdings ?? EMPTY_LIVE : SAMPLE),
-    server, loading, error, refresh, pair, unpair, events, unseen, markSeen,
-  }), [server, holdings, loading, error, refresh, pair, unpair, events, unseen, markSeen]);
+    server, loading, error, refresh, pair, unpair, events, unseen, markSeen, update,
+  }), [server, holdings, loading, error, refresh, pair, unpair, events, unseen, markSeen, update]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

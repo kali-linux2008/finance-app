@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '../components/Icon';
 import { ScreenIn } from '../components/motion';
 import { T } from '../components/T';
+import { UpdateRow } from '../components/UpdateCard';
 import { Card, IconButton } from '../components/ui';
 import { OPEN_ORDERS } from '../data/sample';
 import { disableNotifications, enableNotifications, inExpoGo } from '../lib/alerts';
@@ -82,6 +83,7 @@ export function More() {
             </View>
             <Icon name="chevron_right" size={20} color={c.faint} />
           </Pressable>
+          <UpdateRow />
           {ROWS.map(([icon, label, sub]) => (
             <Pressable key={label} onPress={soon} style={{ flexDirection: 'row', gap: 16, alignItems: 'center', paddingVertical: 14, paddingHorizontal: 16 }}>
               <Icon name={icon} size={22} color={c.muted} />

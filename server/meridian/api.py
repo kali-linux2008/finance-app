@@ -6,12 +6,13 @@ from typing import Literal
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, auth, config, notify, plans, portfolio, prices, trading
+from . import __version__, appupdate, auth, config, notify, plans, portfolio, prices, trading
 from .store import Store
 
 state: dict = {}
@@ -22,9 +23,11 @@ async def lifespan(app: FastAPI):
     config.master_key(create=True)  # eerste start: hoofdsleutel aanmaken als die er nog niet is
     state.setdefault("store", Store())
     state["client"] = httpx.AsyncClient(timeout=15, headers={"User-Agent": f"meridian/{__version__}"})
-    planner = asyncio.create_task(plans.loop(state["store"], state["client"]))  # periodiek inleggen
+    tasks = [asyncio.create_task(plans.loop(state["store"], state["client"])),  # periodiek inleggen
+             asyncio.create_task(appupdate.loop(state["store"]))]  # nieuwe app-versie melden
     yield
-    planner.cancel()
+    for t in tasks:
+        t.cancel()
     await state["client"].aclose()
 
 
@@ -217,3 +220,17 @@ async def put_plan(body: PlanBody, s: Store = Depends(store), c: httpx.AsyncClie
 @app.get("/api/meldingen", dependencies=[Depends(device)])
 def get_events(na: int = 0, s: Store = Depends(store)) -> dict:
     return {"events": notify.events(s, na)}
+
+
+# App-updates: de nieuwste APK die op de server is gebouwd.
+
+@app.get("/api/app", dependencies=[Depends(device)])
+def get_app() -> dict:
+    return {"available": appupdate.info()}
+
+
+@app.get("/api/app/apk", dependencies=[Depends(device)])
+def get_apk() -> FileResponse:
+    if not appupdate.info():
+        raise HTTPException(404, "Er staat geen nieuwe app klaar. Bouw hem op de server met build/android/bouw.sh.")
+    return FileResponse(appupdate.apk_path(), media_type="application/vnd.android.package-archive", filename="meridian.apk")

@@ -15,6 +15,7 @@ import { useMoney } from '../hooks/useMoney';
 import { useApp, useColors } from '../state/app';
 import { useData } from '../state/data';
 import { ErrorBanner, greeting, longDate } from '../components/LiveStatus';
+import { UpdateBanner } from '../components/UpdateCard';
 import type { Filter } from '../lib/portfolio';
 
 /** Kolom die naar verhouding meegroeit, zoals `fr` in CSS grid. Zet padding in een binnenvak, anders telt die mee. */
@@ -64,6 +65,7 @@ export function Overview() {
       </View>
 
       <ErrorBanner />
+      <UpdateBanner />
       <Hero />
 
       <Card style={{ marginTop: 12, marginHorizontal: 16, flexDirection: 'row' }}>

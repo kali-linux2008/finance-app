@@ -22,6 +22,8 @@ _load_env(ENV_PATH)
 
 DATA_DIR = Path(os.environ.get("MERIDIAN_DATA", Path(__file__).resolve().parent.parent / "data"))
 DB_PATH = DATA_DIR / "meridian.db"
+# Waar build/android/bouw.sh de nieuwe app (meridian.apk + versie.json) neerzet.
+APP_DIR = Path(os.environ.get("MERIDIAN_APP_DIR", Path(__file__).resolve().parent.parent.parent / "out"))
 
 # Openbare blockchain-dienst voor je Trezor-saldo. Draai je later je eigen node met mempool,
 # zet dan hier je eigen adres neer: dan ziet niemand anders welke adressen van jou zijn.

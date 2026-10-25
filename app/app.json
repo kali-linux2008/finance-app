@@ -16,7 +16,8 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "nl.jarno.meridian"
+      "package": "nl.jarno.meridian",
+      "permissions": ["android.permission.REQUEST_INSTALL_PACKAGES"]
     },
     "web": {
       "favicon": "./assets/favicon.png",

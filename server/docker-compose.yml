@@ -8,8 +8,11 @@ services:
     volumes:
       # Database + hoofdsleutel. Een volume dat Docker zelf beheert, zodat de rechten altijd kloppen.
       - meridian-data:/app/data
+      # De app die build/android/bouw.sh maakt; de server biedt hem aan als update (alleen lezen).
+      - ../out:/app/out:ro
     environment:
       - TZ=Europe/Amsterdam
+      - MERIDIAN_APP_DIR=/app/out
     env_file:
       - path: .env
         required: false
