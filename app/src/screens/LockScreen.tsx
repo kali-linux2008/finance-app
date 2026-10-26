@@ -1,6 +1,6 @@
 // Vergrendelscherm: pincode instellen (eerste keer) of ontgrendelen met pincode of vingerafdruk.
 import * as Haptics from 'expo-haptics';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Platform, Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
@@ -33,7 +33,6 @@ export function LockScreen() {
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [shake] = useState(() => new Animated.Value(0));
-  const prompted = useRef(false);
 
   const waitSec = Math.ceil(Math.max(0, waitUntil - now) / 1000);
   const waiting = waitSec > 0;
@@ -50,14 +49,6 @@ export function LockScreen() {
       clearInterval(t);
     };
   }, [waitUntil]);
-
-  // Vraag meteen om de vingerafdruk zodra het scherm opent.
-  useEffect(() => {
-    if (bio && !prompted.current) {
-      prompted.current = true;
-      unlockWithBiometric().catch(() => {});
-    }
-  }, [bio, unlockWithBiometric]);
 
   const wrong = (msg: string) => {
     buzz();
