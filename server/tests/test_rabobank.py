@@ -108,12 +108,17 @@ async def test_manual_rabo_balances_not_counted_twice(store, monkeypatch):
         return rabobank.SourceResult(id="rabobank", name="Rabobank")
 
     monkeypatch.setitem(portfolio.FETCHERS, "rabobank", fake)
-    store.set_setting("manual", {"banks": [{"bank": "Rabobank", "name": "Spaar", "value": 100}, {"bank": "ING", "name": "Oranje", "value": 50}]})
+    store.set_setting("manual", {"banks": [{"bank": "Rabobank", "name": "Betaal", "value": 200},
+                                           {"bank": "Rabobank", "name": "Spaar", "kind": "spaar", "value": 100},
+                                           {"bank": "ING", "name": "Oranje", "value": 50}]})
     p = await portfolio.build(store, None)
-    assert [x["src"] for x in p["positions"]] == ["Rabobank", "ING"]
-    store.set_secret("rabobank", {"app_id": "x"})
+    assert [x["name"] for x in p["positions"]] == ["Betaal", "Spaar", "Oranje"]
+    store.set_secret("rabobank", {"app_id": "x", "accounts": [{"uid": "a", "savings": False}]})
     p = await portfolio.build(store, None)
-    assert [x["src"] for x in p["positions"]] == ["ING"]
+    assert [x["name"] for x in p["positions"]] == ["Spaar", "Oranje"]  # spaarrekening zit niet in de koppeling
+    store.set_secret("rabobank", {"app_id": "x", "accounts": [{"uid": "a", "savings": False}, {"uid": "b", "savings": True}]})
+    p = await portfolio.build(store, None)
+    assert [x["name"] for x in p["positions"]] == ["Oranje"]
 
 
 async def test_bank_error_is_not_retried_every_minute(store, monkeypatch):

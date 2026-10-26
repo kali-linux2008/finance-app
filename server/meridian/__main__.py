@@ -223,7 +223,11 @@ def add_bank(s: Store, new_app: bool = False) -> None:
     s.set_secret("rabobank", secret)
     left = rabobank.days_left(secret.get("valid_until"))
     print("Opgeslagen (versleuteld)." + (f" Toestemming geldig tot over {left} dagen." if left is not None else ""))
-    print("Heb je Rabo-saldi ook bij `handmatig` ingevuld? Die telt Meridian nu niet meer mee.")
+    if not any(a.get("savings") for a in secret["accounts"]):
+        print("Je spaarrekening zit er niet bij (de Rabobank geeft die meestal niet door via PSD2).")
+        print("Vul hem in met `python -m meridian handmatig` (bank: Rabobank, Spaarrekening? j); die telt dan gewoon mee.")
+    else:
+        print("Rabo-saldi die je bij `handmatig` invulde, telt Meridian nu niet meer mee.")
     print("Verwijder het .pem-bestand van je computer als je het nergens anders nodig hebt.")
 
 

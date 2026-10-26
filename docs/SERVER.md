@@ -247,7 +247,7 @@ docker compose exec meridian python -m meridian bron rabobank
 
 De saldi staan daarna in de app. De bank staat hooguit 4 opvragingen per dag toe, dus de server haalt ze hooguit **elke 6 uur** op (ook als je ververst). De toestemming is 180 dagen geldig; twee weken van tevoren zie je een waarschuwing. Vernieuwen: dezelfde opdracht nog eens. Een andere applicatie gebruiken: `bron rabobank --nieuw`.
 
-Rabo-saldi die je eerder met `handmatig` invulde, telt Meridian niet meer mee zodra de koppeling er is.
+Rabo-saldi die je eerder met `handmatig` invulde, telt Meridian niet meer mee zodra de koppeling er is. Uitzondering: je **spaarrekening**. Die geeft de Rabobank meestal niet door via PSD2 (alleen betaalrekeningen); vul hem in met `handmatig` (bank: Rabobank, "Spaarrekening?" j), dan telt hij gewoon mee.
 
 ## Bijwerken
 

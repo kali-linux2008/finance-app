@@ -128,8 +128,13 @@ def start_of_day(now: float) -> float:
 async def build(store: Store, client: httpx.AsyncClient, force: bool = False, wait: float | None = WAIT) -> dict:
     data = manual.normalize(store.get_setting("manual"))
     configured = [s for s in store.sources() if s in FETCHERS]
-    if "rabobank" in configured:  # handmatig ingevulde Rabo-saldi niet dubbel tellen
-        data["banks"] = [b for b in data["banks"] if "rabo" not in (b.get("bank") or "").lower()]
+    if "rabobank" in configured:
+        # Handmatige Rabo-saldi niet dubbel tellen. Spaarrekeningen geeft de Rabobank meestal niet
+        # door via de koppeling; die blijven dan handmatig meetellen.
+        linked = (store.get_secret("rabobank") or {}).get("accounts") or []
+        savings_linked = any(a.get("savings") for a in linked)
+        data["banks"] = [b for b in data["banks"] if "rabo" not in (b.get("bank") or "").lower()
+                         or (b.get("kind") == "spaar" and not savings_linked)]
     cached = await asyncio.gather(*(_source(client, store, s, force, wait) for s in configured))
 
     results: list[tuple[SourceResult | None, Cached | None, str]] = [(c.result, c, s) for c, s in zip(cached, configured)]
