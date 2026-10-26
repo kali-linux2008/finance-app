@@ -9,13 +9,16 @@ import httpx
 
 from . import config
 from .models import Position, SourceResult, Wallet
-from .sources import manual, okx, trading212, trezor
+from .sources import manual, okx, rabobank, trading212, trezor
 from .store import Store
 
-FETCHERS = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch}
-TTL = {"t212": 60, "okx": 60, "trezor": 900}  # Trezor-saldo verandert zelden en het opvragen is traag
-ORDER = ["t212", "bank", "trezor", "okx", "manual"]
-NAMES = {"t212": "Trading 212", "okx": "OKX", "trezor": "Trezor"}
+FETCHERS = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch, "rabobank": rabobank.fetch}
+TTL = {"t212": 60, "okx": 60, "trezor": 900, "rabobank": 6 * 3600}  # Trezor is traag; de bank staat 4× per dag toe
+# Bronnen die ook bij "verversen" en na een storing niet vaker dan dit opgehaald mogen worden.
+MIN_AGE = {"rabobank": 6 * 3600}
+RETRY_AFTER = 15 * 60  # zo'n bron na een fout pas na een kwartier opnieuw proberen
+ORDER = ["t212", "rabobank", "bank", "trezor", "okx", "manual"]
+NAMES = {"t212": "Trading 212", "okx": "OKX", "trezor": "Trezor", "rabobank": "Rabobank"}
 # Zo lang wacht de app op een bron. Is hij trager, dan krijgt de app de laatst bekende stand
 # en haalt de server de bron op de achtergrond verder op (de app wacht zelf maximaal 30 s).
 WAIT = 12.0
@@ -30,6 +33,7 @@ class Cached:
     task: asyncio.Task | None = None
     took: float | None = None  # duur van de laatste keer ophalen, in seconden
     restored: bool = False  # result komt uit de opgeslagen laatste stand
+    tried: float = 0  # tijdstip van de laatste poging
 
     @property
     def busy(self) -> bool:
@@ -54,6 +58,7 @@ def _from_json(d: dict) -> SourceResult:
 
 async def _refresh(client: httpx.AsyncClient, store: Store, sid: str, c: Cached) -> None:
     start = time.monotonic()
+    c.tried = time.time()
     try:
         c.result = await FETCHERS[sid](client, store.get_secret(sid) or {})
         c.at, c.error, c.restored = time.time(), None, False
@@ -72,6 +77,11 @@ async def _source(client: httpx.AsyncClient, store: Store, sid: str, force: bool
     fresh = c.result and not c.error and not c.restored and time.time() - c.at < TTL[sid]
     if not force and fresh:
         return c
+    if (limit := MIN_AGE.get(sid)) and not c.busy:
+        now = time.time()
+        recent = c.result is not None and not c.error and now - c.at < limit
+        if recent or (c.error and now - c.tried < RETRY_AFTER):
+            return c  # bijv. de bank: hooguit 4 opvragingen per dag
     if not c.busy:  # nooit twee keer tegelijk dezelfde bron ophalen
         c.task = asyncio.create_task(_refresh(client, store, sid, c))
     try:
@@ -118,6 +128,8 @@ def start_of_day(now: float) -> float:
 async def build(store: Store, client: httpx.AsyncClient, force: bool = False, wait: float | None = WAIT) -> dict:
     data = manual.normalize(store.get_setting("manual"))
     configured = [s for s in store.sources() if s in FETCHERS]
+    if "rabobank" in configured:  # handmatig ingevulde Rabo-saldi niet dubbel tellen
+        data["banks"] = [b for b in data["banks"] if "rabo" not in (b.get("bank") or "").lower()]
     cached = await asyncio.gather(*(_source(client, store, s, force, wait) for s in configured))
 
     results: list[tuple[SourceResult | None, Cached | None, str]] = [(c.result, c, s) for c, s in zip(cached, configured)]
