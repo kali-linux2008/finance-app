@@ -9,7 +9,7 @@ from datetime import datetime
 
 import httpx
 from . import auth, config
-from .sources import okx, trading212, trezor
+from .sources import okx, rabobank, trading212, trezor
 from .store import Store
 
 try:
@@ -24,6 +24,7 @@ HELP = """Meridian-server beheren
   python -m meridian bron trading212       API-sleutel van Trading 212 opslaan (--demo voor oefenaccount)
   python -m meridian bron okx              API-sleutel van OKX opslaan (--demo voor demo-handel)
   python -m meridian bron trezor           publieke sleutel (xpub/zpub) van je Trezor opslaan
+  python -m meridian bron rabobank         Rabobank koppelen via Enable Banking (ook om toestemming te vernieuwen)
   python -m meridian bron trading212-handel  handelssleutel van je Trading 212-oefenaccount (Practice)
   python -m meridian bron okx-handel       handelssleutel van OKX Demo trading
   python -m meridian bron weg <naam>       koppeling verwijderen (bijv. trading212 of okx-handel)
@@ -40,7 +41,7 @@ HELP = """Meridian-server beheren
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
 
-SOURCE_IDS = {"trading212": "t212", "t212": "t212", "okx": "okx", "trezor": "trezor",
+SOURCE_IDS = {"trading212": "t212", "t212": "t212", "okx": "okx", "trezor": "trezor", "rabobank": "rabobank",
               "trading212-handel": "t212.handel", "okx-handel": "okx.handel"}
 
 
@@ -102,7 +103,7 @@ def cmd_init() -> None:
 
 
 async def _test(sid: str, secret: dict) -> None:
-    fetch = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch}[sid]
+    fetch = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch, "rabobank": rabobank.fetch}[sid]
     async with httpx.AsyncClient(timeout=20) as c:
         res = await fetch(c, secret)
     print(f"Gelukt: {res.name} · {eur(res.value)} in {len(res.positions)} posities")
@@ -118,7 +119,7 @@ def cmd_source(args: list[str]) -> None:
     if args[0] == "weg":
         sid = SOURCE_IDS.get(args[1] if len(args) > 1 else "")
         if not sid:
-            print("Welke? trading212, okx, trezor, trading212-handel of okx-handel")
+            print("Welke? trading212, okx, trezor, rabobank, trading212-handel of okx-handel")
             return
         s.delete_secret(sid)
         print("Koppeling verwijderd.")
@@ -127,6 +128,9 @@ def cmd_source(args: list[str]) -> None:
     demo = "--demo" in args
     if sid in ("t212.handel", "okx.handel"):
         add_trade_key(s, sid, live="--echt" in args)
+        return
+    if sid == "rabobank":
+        add_bank(s, new_app="--nieuw" in args)
         return
     if sid == "t212":
         print("Trading 212 → Instellingen → API: maak een sleutel met alleen leesrechten.")
@@ -161,6 +165,66 @@ def cmd_source(args: list[str]) -> None:
             return
     s.set_secret(sid, secret)
     print("Opgeslagen (versleuteld).")
+
+
+def ask_pem() -> str:
+    """Leest een geplakte privésleutel (meerdere regels) tot de END-regel."""
+    print("Plak de inhoud van het .pem-bestand (van -----BEGIN tot en met -----END … KEY-----):")
+    lines: list[str] = []
+    while True:
+        line = clean(input())
+        if line:
+            lines.append(line)
+        if line.startswith("-----END"):
+            return "\n".join(lines) + "\n"
+
+
+def add_bank(s: Store, new_app: bool = False) -> None:
+    """Rabobank koppelen of de toestemming (max. 180 dagen) vernieuwen."""
+    secret = s.get_secret("rabobank") or {}
+    if new_app or not secret.get("app_id"):
+        print("1. Ga op je computer naar enablebanking.com → Control Panel → Applications → Register new application.")
+        print("   Kies Production, laat de sleutel in je browser maken (je downloadt dan een .pem-bestand)")
+        print(f"   en vul bij Allowed redirect URLs in: {rabobank.DEFAULT_REDIRECT}")
+        print("2. Activeer de applicatie door je eigen rekening te koppelen (\"Link accounts\" → Rabobank).")
+        print("   Dat is de gratis variant voor je eigen rekeningen.\n")
+        app_id = ask("Application ID (de lange code van je applicatie)")
+        pem = ask_pem()
+        rabobank.check_key(pem)
+        secret = {"app_id": app_id, "key_pem": pem, "redirect": ask("Redirect-URL", rabobank.DEFAULT_REDIRECT)}
+    redirect = secret.get("redirect") or rabobank.DEFAULT_REDIRECT
+
+    async def begin() -> tuple[str, str]:
+        async with httpx.AsyncClient(timeout=30) as c:
+            return await rabobank.start(c, secret, redirect)
+
+    try:
+        url, state = asyncio.run(begin())
+    except Exception as e:
+        print("Mislukt:", describe(e))
+        return
+    print("\nOpen dit adres op je telefoon of computer en log in bij de Rabobank:\n")
+    print(url)
+    print("\nGeef toestemming en vink je rekeningen aan. Daarna kom je op een pagina die niet laadt")
+    print(f"({redirect}?…). Dat hoort zo: kopieer het hele adres uit de adresbalk en plak het hier.")
+    try:
+        code = rabobank.code_from(ask("Adres"), state)
+
+        async def done() -> dict:
+            async with httpx.AsyncClient(timeout=30) as c:
+                new = await rabobank.finish(c, secret, code)
+                await _test("rabobank", new)
+                return new
+
+        secret = asyncio.run(done())
+    except Exception as e:
+        print("Mislukt:", describe(e))
+        return
+    s.set_secret("rabobank", secret)
+    left = rabobank.days_left(secret.get("valid_until"))
+    print("Opgeslagen (versleuteld)." + (f" Toestemming geldig tot over {left} dagen." if left is not None else ""))
+    print("Heb je Rabo-saldi ook bij `handmatig` ingevuld? Die telt Meridian nu niet meer mee.")
+    print("Verwijder het .pem-bestand van je computer als je het nergens anders nodig hebt.")
 
 
 def add_trade_key(s: Store, sid: str, live: bool = False) -> None:

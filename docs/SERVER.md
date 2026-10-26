@@ -228,6 +228,27 @@ De server kijkt elke 2 minuten, ook als je telefoon uit staat. De melding komt v
 
 Koersen komen alleen van bronnen die Meridian al gebruikt: je eigen posities (Trading 212, OKX) en de openbare koersen van OKX voor crypto. Er gaat niets extra's naar buiten. Daardoor kun je aandelen die je niet hebt (nog) niet volgen, en is er voor aandelen geen koersgrafiek. De koers van een aandeel ververst zolang de beurs open is.
 
+## 10. Rabobank koppelen
+
+Je betaal- en spaarrekening, alleen-lezen. Meridian mag als privépersoon niet zelf bij de bank (daarvoor is een PSD2-vergunning nodig), dus het gaat via **Enable Banking**. Dat is gratis zolang je alleen je eigen rekeningen koppelt.
+
+**Eenmalig bij Enable Banking (op je computer):**
+1. Maak een account op [enablebanking.com](https://enablebanking.com) en open het **Control Panel**.
+2. **Applications → Register new application**. Kies **Production**. Laat de sleutel in je browser maken: je downloadt dan een `.pem`-bestand. Vul bij **Allowed redirect URLs** in: `https://localhost/meridian`.
+3. Activeer de applicatie met **Link accounts → Rabobank** (inloggen met de Rabo-app). Zo werkt hij gratis, alleen voor je eigen rekeningen.
+
+**Op de server:**
+```bash
+docker compose exec meridian python -m meridian bron rabobank
+```
+- Vul de **Application ID** in en plak de inhoud van het `.pem`-bestand (van `-----BEGIN` tot en met `-----END … KEY-----`). Plak dit alleen in het SSH-venster, nooit in een chat.
+- De server geeft een adres. Open het, log in bij de Rabobank en geef toestemming voor je rekeningen.
+- Je komt daarna op een pagina die niet laadt (`https://localhost/meridian?…`). Dat hoort zo: kopieer het **hele adres** uit de adresbalk en plak het op de server.
+
+De saldi staan daarna in de app. De bank staat hooguit 4 opvragingen per dag toe, dus de server haalt ze hooguit **elke 6 uur** op (ook als je ververst). De toestemming is 180 dagen geldig; twee weken van tevoren zie je een waarschuwing. Vernieuwen: dezelfde opdracht nog eens. Een andere applicatie gebruiken: `bron rabobank --nieuw`.
+
+Rabo-saldi die je eerder met `handmatig` invulde, telt Meridian niet meer mee zodra de koppeling er is.
+
 ## Bijwerken
 
 ```bash
