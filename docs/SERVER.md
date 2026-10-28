@@ -249,6 +249,24 @@ De saldi staan daarna in de app. De bank staat hooguit 4 opvragingen per dag toe
 
 Rabo-saldi die je eerder met `handmatig` invulde, telt Meridian niet meer mee zodra de koppeling er is. Uitzondering: je **spaarrekening**. Die geeft de Rabobank meestal niet door via PSD2 (alleen betaalrekeningen); vul hem in met `handmatig` (bank: Rabobank, "Spaarrekening?" j), dan telt hij gewoon mee.
 
+### Spaarrekening via een CSV-bestand
+
+Wat de koppeling niet doorgeeft (meestal je spaarrekening), stuur je als CSV-bestand:
+
+1. Log in op rabobank.nl (Rabo Online Bankieren), kies je spaarrekening → **Download transacties** → formaat **CSV**.
+2. Open in Meridian **Meer → Rabo-CSV** en tik op **Kies CSV-bestand**.
+
+Meridian leest per rekening het saldo na de laatste transactie. Het bestand blijft op je eigen server. Elke **zondag om 10:00** krijg je een herinnering (niet als je de afgelopen 3 dagen al een bestand stuurde); tik erop en je komt meteen op het juiste scherm.
+
+```bash
+docker compose exec meridian python -m meridian melding csv          # bekijken
+docker compose exec meridian python -m meridian melding csv wo 19    # woensdag 19:00
+docker compose exec meridian python -m meridian melding csv uit      # uitzetten (aan = weer aan)
+docker compose exec meridian python -m meridian melding csv test     # testherinnering
+```
+
+Zodra er een CSV is, tellen handmatig ingevulde Rabo-saldi niet meer mee.
+
 ## Bijwerken
 
 ```bash

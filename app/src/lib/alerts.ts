@@ -26,6 +26,27 @@ export function newSince(events: ServerEvent[], last: number | null): ServerEven
   return events.filter((e) => e.id > last);
 }
 
+/** Waar een tik op de melding naartoe gaat. */
+export function screenFor(e: Pick<ServerEvent, 'kind' | 'title'>): string {
+  if (e.kind === 'csv') return '/bank';
+  if (e.title.startsWith('Koersalert')) return '/volglijst';
+  if (e.title.startsWith('Inleg')) return '/periodiek';
+  return '/meldingen';
+}
+
+/** Tik op een melding: open het juiste scherm (ook als de app daardoor net opstart). */
+export async function onNotificationTap(open: (url: string) => void): Promise<() => void> {
+  if (!native) return () => {};
+  const N = await notifications();
+  const go = (r: { notification: { request: { content: { data?: Record<string, unknown> | null } } } } | null) => {
+    const url = r?.notification.request.content.data?.url;
+    if (typeof url === 'string') open(url);
+  };
+  go(N.getLastNotificationResponse());
+  const sub = N.addNotificationResponseReceivedListener(go);
+  return () => sub.remove();
+}
+
 /** Nieuwe meldingen ophalen en (als meldingen aan staan) op de telefoon tonen. */
 export async function checkEvents(cfg?: ServerConfig | null): Promise<ServerEvent[]> {
   const server = cfg ?? (await storedServer());
@@ -39,7 +60,7 @@ export async function checkEvents(cfg?: ServerConfig | null): Promise<ServerEven
   if (native && fresh.length && (await getItem(KEYS.notify)) === 'on') {
     const N = await notifications();
     for (const e of fresh) {
-      await N.scheduleNotificationAsync({ content: { title: e.title, body: e.body }, trigger: null });
+      await N.scheduleNotificationAsync({ content: { title: e.title, body: e.body, data: { url: screenFor(e) } }, trigger: null });
     }
   }
   return fresh;

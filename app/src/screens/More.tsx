@@ -27,6 +27,7 @@ const ROWS: [IconName, string, string, string?][] = [
   ['insights', 'Inzichten & allocatie', 'Regio, valuta, kosten, Box 3'],
   ['payments', 'Inkomen & dividend', 'Afgelopen 12 maanden'],
   ['link', 'Bronnen', '5 gekoppeld'],
+  ['account_balance', 'Rabo-CSV', 'Spaarrekening bijwerken met een CSV-bestand', '/bank'],
   ['notifications', 'Meldingen', 'Alle meldingen van je server', '/meldingen'],
 ];
 

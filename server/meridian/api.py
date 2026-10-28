@@ -12,7 +12,8 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, alerts, appupdate, auth, config, notify, plans, portfolio, prices, trading
+from . import __version__, alerts, appupdate, auth, config, notify, plans, portfolio, prices, reminders, trading
+from .sources import rabocsv
 from .store import Store
 
 state: dict = {}
@@ -25,7 +26,8 @@ async def lifespan(app: FastAPI):
     state["client"] = httpx.AsyncClient(timeout=15, headers={"User-Agent": f"meridian/{__version__}"})
     tasks = [asyncio.create_task(plans.loop(state["store"], state["client"])),  # periodiek inleggen
              asyncio.create_task(appupdate.loop(state["store"])),  # nieuwe app-versie melden
-             asyncio.create_task(alerts.loop(state["store"], state["client"]))]  # koersalerts
+             asyncio.create_task(alerts.loop(state["store"], state["client"])),  # koersalerts
+             asyncio.create_task(reminders.loop(state["store"]))]  # wekelijkse herinnering Rabo-CSV
     yield
     for t in tasks:
         t.cancel()
@@ -295,6 +297,38 @@ async def delete_watch(body: KeyBody, s: Store = Depends(store), c: httpx.AsyncC
 @app.get("/api/zoek", dependencies=[Depends(device)])
 async def search(q: str = "", s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
     return {"results": await alerts.search(s, c, q[:40])}
+
+
+# Rabobank-CSV (voor rekeningen die de bankkoppeling niet doorgeeft, zoals de spaarrekening).
+
+class CsvBody(BaseModel):
+    text: str
+
+
+def _csv_state(s: Store) -> dict:
+    st = rabocsv.state(s)
+    return {
+        "accounts": [{"iban": f"…{i[-4:]}", "balance": v["balance"], "date": v["date"]} for i, v in sorted(st["accounts"].items())],
+        "uploaded": st.get("uploaded"),
+        "reminder": reminders.describe(s),
+    }
+
+
+@app.get("/api/bank/csv", dependencies=[Depends(device)])
+def get_csv(s: Store = Depends(store)) -> dict:
+    return _csv_state(s)
+
+
+@app.post("/api/bank/csv", dependencies=[Depends(device)])
+def post_csv(body: CsvBody, s: Store = Depends(store)) -> dict:
+    if len(body.text) > rabocsv.MAX_BYTES:
+        raise HTTPException(400, "Dit bestand is te groot. Download een kortere periode (bijv. de laatste maand).")
+    try:
+        found = rabocsv.parse(body.text)
+    except rabocsv.CsvError as e:
+        raise HTTPException(400, str(e)) from e
+    rabocsv.save(s, found)
+    return {**_csv_state(s), "found": len(found)}
 
 
 # App-updates: de nieuwste APK die op de server is gebouwd.

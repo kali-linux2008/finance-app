@@ -9,7 +9,7 @@ import httpx
 
 from . import config
 from .models import Position, SourceResult, Wallet
-from .sources import manual, okx, rabobank, trading212, trezor
+from .sources import manual, okx, rabobank, rabocsv, trading212, trezor
 from .store import Store
 
 FETCHERS = {"t212": trading212.fetch, "okx": okx.fetch, "trezor": trezor.fetch, "rabobank": rabobank.fetch}
@@ -17,7 +17,7 @@ TTL = {"t212": 60, "okx": 60, "trezor": 900, "rabobank": 6 * 3600}  # Trezor is 
 # Bronnen die ook bij "verversen" en na een storing niet vaker dan dit opgehaald mogen worden.
 MIN_AGE = {"rabobank": 6 * 3600}
 RETRY_AFTER = 15 * 60  # zo'n bron na een fout pas na een kwartier opnieuw proberen
-ORDER = ["t212", "rabobank", "bank", "trezor", "okx", "manual"]
+ORDER = ["t212", "rabobank", "rabocsv", "bank", "trezor", "okx", "manual"]
 NAMES = {"t212": "Trading 212", "okx": "OKX", "trezor": "Trezor", "rabobank": "Rabobank"}
 # Zo lang wacht de app op een bron. Is hij trager, dan krijgt de app de laatst bekende stand
 # en haalt de server de bron op de achtergrond verder op (de app wacht zelf maximaal 30 s).
@@ -135,9 +135,16 @@ async def build(store: Store, client: httpx.AsyncClient, force: bool = False, wa
         savings_linked = any(a.get("savings") for a in linked)
         data["banks"] = [b for b in data["banks"] if "rabo" not in (b.get("bank") or "").lower()
                          or (b.get("kind") == "spaar" and not savings_linked)]
+    # Rabo-rekeningen uit een CSV-bestand (bijv. de spaarrekening), behalve wat de koppeling al levert.
+    linked_ibans = {a.get("iban") for a in (store.get_secret("rabobank") or {}).get("accounts") or []} - {None}
+    csv_src = rabocsv.source(store, linked_ibans)
+    if csv_src:  # dan geen handmatige Rabo-saldi meer
+        data["banks"] = [b for b in data["banks"] if "rabo" not in (b.get("bank") or "").lower()]
     cached = await asyncio.gather(*(_source(client, store, s, force, wait) for s in configured))
 
     results: list[tuple[SourceResult | None, Cached | None, str]] = [(c.result, c, s) for c, s in zip(cached, configured)]
+    if csv_src:
+        results.append((csv_src, None, "rabocsv"))
     bank = manual.bank_source(data)
     if bank:
         results.append((bank, None, "bank"))

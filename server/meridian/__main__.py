@@ -37,6 +37,7 @@ HELP = """Meridian-server beheren
   python -m meridian handel periodiek      periodiek inleggen bekijken (aan / uit / maximum 400)
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
   python -m meridian melding               laatste meldingen tonen (melding test = testmelding)
+  python -m meridian melding csv           wekelijkse herinnering voor de Rabo-CSV (zo 10 / uit / test)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -402,6 +403,9 @@ def cmd_notify(args: list[str]) -> None:
     from . import notify
 
     s = Store()
+    if args[:1] == ["csv"]:
+        cmd_csv_reminder(s, args[1:])
+        return
     if args[:1] == ["test"]:
         notify.add(s, "Meridian", "Testmelding: meldingen werken.")
         print("Testmelding klaargezet. De app laat hem zien zodra hij bij de server kijkt:")
@@ -412,6 +416,29 @@ def cmd_notify(args: list[str]) -> None:
         print("Nog geen meldingen.")
     for e in items:
         print(f"  {datetime.fromtimestamp(e['at']).strftime('%d-%m %H:%M')}  {e['title']}: {e['body']}")
+
+
+def cmd_csv_reminder(s: Store, args: list[str]) -> None:
+    """melding csv [aan|uit|test|<dag> <uur>]: de wekelijkse herinnering voor de Rabo-CSV."""
+    from . import notify, reminders
+
+    cur = reminders.settings(s)
+    if args[:1] in (["aan"], ["uit"]):
+        cur["on"] = args[0] == "aan"
+    elif args[:1] == ["test"]:
+        notify.add(s, "Rabo-CSV", "Testherinnering: tik hier om je CSV-bestand te kiezen.", "csv")
+        print("Testherinnering klaargezet.")
+        return
+    elif args:
+        day = args[0][:2].lower()
+        if day not in reminders.DAYS or len(args) < 2 or not args[1].isdigit() or not 0 <= int(args[1]) <= 23:
+            print("Gebruik: melding csv zo 10   (dag ma/di/wo/do/vr/za/zo en een uur 0–23)")
+            return
+        cur.update(on=True, day=reminders.DAYS.index(day), hour=int(args[1]))
+    if args:
+        s.set_setting(reminders.KEY, cur)
+    print(f"Herinnering Rabo-CSV: {reminders.describe(s)}.")
+    print("Aanpassen: melding csv zo 10 · melding csv uit · melding csv test")
 
 
 def cmd_manual() -> None:
