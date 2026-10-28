@@ -43,7 +43,7 @@ HELP = """Meridian-server beheren
   python -m meridian bank tegenpartijen    hoe je tegenrekeningen zijn ingedeeld · bank regel <IBAN> <soort>
   python -m meridian rendement             nu waard vs. ingelegd per broker (start t212 5000 = eerdere stortingen)
   python -m meridian herbalanceren         doelverdeling en advies (doel aandelen 70 crypto 20 cash 10 goud 0 · bijkopen 375)
-  python -m meridian apparaten             gekoppelde telefoons tonen
+  python -m meridian apparaten             gekoppelde telefoons tonen (apparaten weg 2 = één ontkoppelen)
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
 
@@ -430,7 +430,7 @@ def cmd_notify_types(s: Store, args: list[str]) -> None:
     """melding soorten [<soort> aan|uit] of melding soorten doel <bedrag>."""
     from . import digest
 
-    names = {"koers": "price", "koersalerts": "price", "dividend": "div", "doel": "goal", "mijlpalen": "goal", "week": "week", "weekoverzicht": "week"}
+    names = {"koers": "price", "koersalerts": "price", "dividend": "div", "doel": "goal", "mijlpalen": "goal", "week": "week", "weekoverzicht": "week", "orders": "order", "order": "order"}
     if len(args) >= 2 and args[0] == "doel" and args[1] not in ("aan", "uit"):
         try:
             value = parse_amount(args[1])
@@ -667,19 +667,31 @@ def cmd_status() -> None:
         print("Let op:", w)
 
 
-def cmd_devices(remove: bool = False) -> None:
+def cmd_devices(remove: bool = False, args: list[str] | None = None) -> None:
+    """apparaten · apparaten weg <nr> (één telefoon) · ontkoppel (alle telefoons)"""
     s = Store()
     if remove:
         with s.tx() as c:
             c.execute("DELETE FROM devices")
         print("Alle telefoons ontkoppeld. Koppel opnieuw met een koppelcode.")
         return
-    rows = s._all("SELECT name, created, last_seen FROM devices ORDER BY created")
+    rows = s._all("SELECT token_hash, name, created, last_seen FROM devices ORDER BY created")
+    args = args or []
+    if args[:1] == ["weg"]:
+        if len(args) != 2 or not args[1].isdigit() or not 1 <= int(args[1]) <= len(rows):
+            print("Gebruik: apparaten weg <nummer>   (het nummer zie je bij: apparaten)")
+            return
+        with s.tx() as c:
+            c.execute("DELETE FROM devices WHERE token_hash = ?", (rows[int(args[1]) - 1][0],))
+        print(f"{rows[int(args[1]) - 1][1]} ontkoppeld. Die telefoon kan niet meer bij je gegevens.")
+        return
     if not rows:
         print("Nog geen telefoon gekoppeld.")
-    for name, created, seen in rows:
+    for i, (_, name, created, seen) in enumerate(rows, 1):
         when = datetime.fromtimestamp(seen or created).strftime("%d-%m-%Y %H:%M")
-        print(f"  {name:<20} laatst gezien {when}")
+        print(f"  {i}. {name:<20} gekoppeld {datetime.fromtimestamp(created):%d-%m-%Y} · laatst gezien {when}")
+    if rows:
+        print("Eén telefoon ontkoppelen: apparaten weg <nummer>")
 
 
 def main(argv: list[str]) -> None:
@@ -707,7 +719,7 @@ def main(argv: list[str]) -> None:
     elif cmd == "handel":
         cmd_trade(args)
     elif cmd == "apparaten":
-        cmd_devices()
+        cmd_devices(args=args)
     elif cmd == "ontkoppel":
         cmd_devices(remove=True)
     else:

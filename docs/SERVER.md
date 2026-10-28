@@ -304,6 +304,8 @@ docker compose exec meridian python -m meridian bank regels           # je regel
 
 Soorten: `t212`, `okx`, `abo` (abonnementen), `eigen`, `in`, `uit`. Een regel kan een IBAN zijn of een stukje van de naam of omschrijving. Trading 212 en OKX herkent de server zelf aan de naam; je **abonnementenrekening** bij Trading 212 moet je één keer aanwijzen met een regel op haar IBAN (zie `bank tegenpartijen`).
 
+Een overzicht van alle opdrachten staat in [OPDRACHTEN.md](OPDRACHTEN.md).
+
 ## Bijwerken
 
 ```bash

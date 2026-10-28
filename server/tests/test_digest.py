@@ -86,7 +86,7 @@ def test_api_settings(store, monkeypatch):
         token = c.post("/api/koppel", json={"code": auth.new_pair_code(store)}).json()["token"]
         h = {"Authorization": f"Bearer {token}"}
         r = c.get("/api/meldingen/instellingen", headers=h).json()
-        assert r["types"] == {"price": True, "div": True, "goal": True, "week": True} and r["goal"] == 500000
+        assert r["types"] == {"price": True, "div": True, "goal": True, "week": True, "order": True} and r["goal"] == 500000
         r = c.put("/api/meldingen/instellingen", headers=h, json={"types": {"week": False, "onzin": False}, "goal": 750000}).json()
         assert r["types"]["week"] is False and "onzin" not in r["types"] and r["goal"] == 750000
         assert c.put("/api/meldingen/instellingen", headers=h, json={"goal": 5}).status_code == 400

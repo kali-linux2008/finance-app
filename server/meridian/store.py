@@ -22,6 +22,8 @@ CREATE TABLE IF NOT EXISTS orders (
   action TEXT NOT NULL, symbol TEXT NOT NULL, kind TEXT, amount REAL, qty REAL, price REAL,
   ok INTEGER NOT NULL, broker_id TEXT, message TEXT
 );
+CREATE TABLE IF NOT EXISTS pos_snap (day TEXT NOT NULL, id TEXT NOT NULL, tk TEXT NOT NULL, price REAL NOT NULL,
+  PRIMARY KEY (day, id));
 CREATE TABLE IF NOT EXISTS bank_tx (
   iban TEXT NOT NULL, seq INTEGER NOT NULL, date TEXT NOT NULL, amount REAL NOT NULL,
   counter_iban TEXT, counter_name TEXT, descr TEXT, PRIMARY KEY (iban, seq)
@@ -143,11 +145,20 @@ class Store:
         rows = self._all(f"SELECT {', '.join(BANK_TX_FIELDS)} FROM bank_tx WHERE date >= ? ORDER BY date, iban, seq", (since,))
         return [dict(zip(BANK_TX_FIELDS, r)) for r in rows]
 
+    # Koers per positie per dag (voor de beste en slechtste van de week).
+    def add_pos_snaps(self, day: str, rows: list[tuple[str, str, float]]) -> None:
+        with self.tx() as c:
+            c.executemany("INSERT OR REPLACE INTO pos_snap VALUES (?, ?, ?, ?)", [(day, i, tk, p) for i, tk, p in rows])
+
+    def pos_snaps(self, since_day: str) -> list[tuple[str, str, str, float]]:
+        return self._all("SELECT day, id, tk, price FROM pos_snap WHERE day >= ? ORDER BY day", (since_day,))
+
     def prune_old(self, before_date: str, before_ts: float) -> int:
         """Banktransacties en orderregels van vóór deze datum weghalen. Geeft het aantal regels terug."""
         with self.tx() as c:
             n = c.execute("DELETE FROM bank_tx WHERE date < ?", (before_date,)).rowcount
             n += c.execute("DELETE FROM orders WHERE ts < ?", (before_ts,)).rowcount
+            n += c.execute("DELETE FROM pos_snap WHERE day < ?", (before_date,)).rowcount
         return n
 
     def optimize(self) -> None:

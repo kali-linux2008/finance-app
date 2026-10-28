@@ -18,7 +18,8 @@ from .store import Store
 log = logging.getLogger("meridian.digest")
 
 TYPES_KEY = "notify.types"
-TYPES = {"price": "Koersalerts", "div": "Dividend ontvangen", "goal": "Doel-mijlpalen", "week": "Weekoverzicht"}
+TYPES = {"price": "Koersalerts", "div": "Dividend ontvangen", "goal": "Doel-mijlpalen", "week": "Weekoverzicht",
+         "order": "Orders uitgevoerd"}
 GOAL_KEY = "goal.fire"
 DEFAULT_GOAL = 500_000.0
 WEEK_DAY, WEEK_HOUR = 6, 18  # zondag 18:00, zoals in het ontwerp
@@ -86,7 +87,31 @@ def weekly(store: Store, now: datetime) -> dict | None:
     pct = diff / start[1] * 100 if start[1] else 0
     fire = end[1] / goal(store) * 100
     body = f"{_eur(diff, signed=True)} ({_pct(pct)}) deze week. Totaal {_eur(end[1])}, FIRE-doel nu {fire:.0f}%."
+    if movers := week_movers(store, monday):
+        best, worst = movers
+        body += f" Beste: {best[0]} {_pct(best[1])}" + (f", slechtste: {worst[0]} {_pct(worst[1])}." if worst != best else ".")
     return notify.add(store, f"Weekoverzicht · week {now.isocalendar().week}", body, "info")
+
+
+def record_prices(store: Store, positions: list[dict], now: datetime) -> None:
+    """Eén koers per positie per dag bewaren (de laatste van die dag)."""
+    rows = [(p["id"], p["tk"], float(p["price"])) for p in positions if p.get("cat") in ("eq", "cr") and p.get("price")]
+    if rows:
+        store.add_pos_snaps(now.date().isoformat(), rows)
+
+
+def week_movers(store: Store, monday: datetime) -> tuple[tuple[str, float], tuple[str, float]] | None:
+    """(tk, %) van de beste en slechtste positie sinds maandag, op koers (niet op bijkopen)."""
+    first: dict[str, tuple[str, float]] = {}
+    last: dict[str, float] = {}
+    for _, pid, tk, price in store.pos_snaps(monday.date().isoformat()):
+        first.setdefault(pid, (tk, price))
+        last[pid] = price
+    changes = [(tk, (last[pid] / p0 - 1) * 100) for pid, (tk, p0) in first.items() if p0 and pid in last]
+    if not changes:
+        return None
+    changes.sort(key=lambda x: x[1])
+    return changes[-1], changes[0]
 
 
 # Mijlpalen (elke 10% van het FIRE-doel)
@@ -186,7 +211,11 @@ async def loop(store: Store, client: httpx.AsyncClient) -> None:
             weekly(store, now)
             milestone(store, now)
             await dividends(store, client)
-            moves(store, (await portfolio.build(store, client))["positions"], now)
+            positions = (await portfolio.build(store, client))["positions"]
+            moves(store, positions, now)
+            record_prices(store, positions, now)
+            from . import fills  # hier pas: fills gebruikt zelf digest
+            await fills.check(store, client)
         except Exception:  # noqa: BLE001
             log.exception("Meldingen: onverwachte fout")
         await asyncio.sleep(CHECK_EVERY)

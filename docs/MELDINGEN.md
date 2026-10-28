@@ -25,7 +25,8 @@ Laatste meldingen bekijken: `docker compose exec meridian python -m meridian mel
 | Koersalerts | als een koers je doel raakt (zie SERVER.md, stap 9) |
 | Dividend ontvangen | nieuw dividend op Trading 212 (de server kijkt elke 6 uur) |
 | Doel-mijlpalen | bij elke 10% van je FIRE-doel (standaard € 500.000) |
-| Weekoverzicht | zondag 18:00: hoeveel je vermogen deze week veranderde |
+| Weekoverzicht | zondag 18:00: hoeveel je vermogen deze week veranderde, met de beste en slechtste belegging |
+| Orders uitgevoerd | een limietorder is (helemaal) uitgevoerd bij Trading 212 of OKX |
 | Rabo-CSV | wekelijkse herinnering om een CSV-bestand te sturen (zondag 10:00) |
 | Nieuwe app-versie | als er een nieuwe app klaarstaat |
 
