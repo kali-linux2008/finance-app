@@ -5,7 +5,7 @@ en een melding als een bron langer dan een dag niet werkt.
 import asyncio
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -16,6 +16,7 @@ from .store import Store
 log = logging.getLogger("meridian.maintenance")
 
 KEEP_BACKUPS = 14
+KEEP_YEARS = 3
 BACKUP_HOUR = 3  # 's nachts, als je de app niet gebruikt
 REFRESH_EVERY = 3600
 OUTAGE_AFTER = 24 * 3600
@@ -41,6 +42,12 @@ def backup(store: Store, now: datetime) -> Path | None:
     dest.chmod(0o600)
     for old in sorted(folder.glob("meridian-*.db"))[:-KEEP_BACKUPS]:
         old.unlink()
+    # Meteen ook opruimen: transacties en orderregels ouder dan 3 jaar, en de database bijhouden.
+    cutoff = now - timedelta(days=365 * KEEP_YEARS)
+    removed = store.prune_old(cutoff.date().isoformat(), cutoff.timestamp())
+    store.optimize()
+    if removed:
+        log.info("Opgeruimd: %d oude regels", removed)
     return dest
 
 

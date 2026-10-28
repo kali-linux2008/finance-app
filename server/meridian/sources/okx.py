@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 
 import httpx
 
-from .. import config, prices
+from .. import config, net, prices
 from ..models import Position, SourceResult
 
 # OKX heeft per regio een eigen omgeving; een sleutel werkt alleen in de omgeving waar hij gemaakt is.
@@ -57,7 +57,7 @@ async def request(client: httpx.AsyncClient, secret: dict, method: str, path: st
     }
     if secret.get("demo"):
         headers["x-simulated-trading"] = "1"
-    r = await client.request(method, secret.get("domain", config.OKX_URL) + path, headers=headers, content=payload or None)
+    r = await net.request(client, method, secret.get("domain", config.OKX_URL) + path, headers=headers, content=payload or None)
     data = r.json()
     if data.get("code") != "0":
         code = str(data.get("code"))

@@ -1,16 +1,16 @@
 """HTTP-API voor de app. Alles behalve /api/health en /api/koppel vraagt de apparaat-sleutel."""
 
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Literal
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
-import asyncio
 
 from . import __version__, alerts, appupdate, auth, banktx, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, returns, trading
 from .sources import rabocsv
@@ -21,19 +21,26 @@ state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     config.master_key(create=True)  # eerste start: hoofdsleutel aanmaken als die er nog niet is
     state.setdefault("store", Store())
     state["client"] = httpx.AsyncClient(timeout=15, headers={"User-Agent": f"meridian/{__version__}"})
-    tasks = [asyncio.create_task(plans.loop(state["store"], state["client"])),  # periodiek inleggen
-             asyncio.create_task(appupdate.loop(state["store"])),  # nieuwe app-versie melden
-             asyncio.create_task(alerts.loop(state["store"], state["client"])),  # koersalerts
-             asyncio.create_task(reminders.loop(state["store"])),  # wekelijkse herinnering Rabo-CSV
-             asyncio.create_task(digest.loop(state["store"], state["client"])),  # weekoverzicht, mijlpalen, dividend
-             asyncio.create_task(maintenance.loop(state["store"], state["client"]))]  # back-up, bronnen bijwerken
+    s, c = state["store"], state["client"]
+    loops = {
+        "periodiek": plans.loop(s, c),  # periodiek inleggen
+        "app-update": appupdate.loop(s),  # nieuwe app-versie melden
+        "koersalerts": alerts.loop(s, c),
+        "csv-herinnering": reminders.loop(s),  # wekelijkse herinnering Rabo-CSV
+        "meldingen": digest.loop(s, c),  # weekoverzicht, mijlpalen, dividend, grote bewegingen
+        "onderhoud": maintenance.loop(s, c),  # back-up, bronnen bijwerken, storingen
+    }
+    state["tasks"] = {name: asyncio.create_task(coro, name=name) for name, coro in loops.items()}
     yield
-    for t in tasks:
+    # Netjes stoppen: taken afbreken en wachten tot ze echt klaar zijn, dan pas de verbinding dicht.
+    for t in state["tasks"].values():
         t.cancel()
-    await state["client"].aclose()
+    await asyncio.gather(*state["tasks"].values(), return_exceptions=True)
+    await c.aclose()
 
 
 app = FastAPI(title="Meridian", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -41,6 +48,22 @@ app = FastAPI(title="Meridian", version=__version__, lifespan=lifespan, docs_url
 # Alleen voor testen met de webversie van de app; de telefoon-app heeft dit niet nodig.
 if origins := os.environ.get("MERIDIAN_CORS_ORIGINS"):
     app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_methods=["GET", "POST", "PUT"], allow_headers=["Authorization", "Content-Type"])
+
+
+MAX_BODY = 6_000_000  # ruim genoeg voor een Rabo-CSV; grotere verzoeken weigeren we meteen
+
+
+@app.middleware("http")
+async def safety(request, call_next):
+    size = request.headers.get("content-length")
+    if size and size.isdigit() and int(size) > MAX_BODY:
+        return JSONResponse({"detail": "Dit verzoek is te groot."}, status_code=413)
+    response = await call_next(request)
+    # Bedragen en sleutels nooit in een cache, en geen verwijzingen naar buiten.
+    response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 def store() -> Store:
@@ -59,7 +82,13 @@ def device(authorization: str = Header(default=""), s: Store = Depends(store)) -
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "name": "meridian", "version": __version__}
+    tasks = {name: not t.done() for name, t in state.get("tasks", {}).items()}
+    try:
+        state["store"]._one("SELECT 1")
+        db = True
+    except Exception:  # noqa: BLE001
+        db = False
+    return {"ok": db and all(tasks.values()), "name": "meridian", "version": __version__, "db": db, "tasks": tasks}
 
 
 class PairBody(BaseModel):

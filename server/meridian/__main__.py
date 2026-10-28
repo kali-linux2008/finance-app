@@ -415,7 +415,7 @@ def cmd_notify(args: list[str]) -> None:
         cmd_notify_types(s, args[1:])
         return
     if args[:1] == ["test"]:
-        notify.add(s, "Meridian", "Testmelding: meldingen werken.")
+        notify.add(s, "Meridian", f"Testmelding ({datetime.now():%H:%M:%S}): meldingen werken.")
         print("Testmelding klaargezet. De app laat hem zien zodra hij bij de server kijkt:")
         print("meteen als je hem opent, en anders binnen ongeveer een kwartier.")
         return

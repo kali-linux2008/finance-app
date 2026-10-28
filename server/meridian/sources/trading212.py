@@ -11,6 +11,8 @@ import time
 
 import httpx
 
+from .. import net
+
 from ..models import Position, SourceResult
 
 LIVE = "https://live.trading212.com/api/v0"
@@ -62,7 +64,7 @@ async def request(client: httpx.AsyncClient, base: str, method: str, path: str, 
                   body: dict | None = None) -> object:
     # Bij 429 is het verzoek niet uitgevoerd (ook geen order), dus opnieuw proberen is veilig.
     for attempt in range(RATE_RETRIES + 1):
-        r = await client.request(method, base + path, headers=headers, json=body)
+        r = await net.request(client, method, base + path, headers=headers, json=body)
         if r.status_code != 429 or attempt == RATE_RETRIES:
             break
         await _sleep(_wait_for(r))

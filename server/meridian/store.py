@@ -40,7 +40,13 @@ class Store:
         if self.path != ":memory:":
             config.DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._key = key
-        self._conn = sqlite3.connect(self.path, check_same_thread=False)
+        self._conn = sqlite3.connect(self.path, check_same_thread=False, timeout=10)
+        if self.path != ":memory:":
+            # WAL: lezen en schrijven zitten elkaar niet in de weg (ook niet tijdens de back-up);
+            # NORMAL is in WAL-modus veilig bij een stroomstoring en een stuk sneller.
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
         self._conn.executescript(SCHEMA)
         # Eén verbinding voor alle verzoeken; de app vraagt soms twee dingen tegelijk. Daarom om de beurt.
         self._lock = threading.RLock()
@@ -136,6 +142,17 @@ class Store:
     def bank_tx(self, since: str = "0000-00-00") -> list[dict]:
         rows = self._all(f"SELECT {', '.join(BANK_TX_FIELDS)} FROM bank_tx WHERE date >= ? ORDER BY date, iban, seq", (since,))
         return [dict(zip(BANK_TX_FIELDS, r)) for r in rows]
+
+    def prune_old(self, before_date: str, before_ts: float) -> int:
+        """Banktransacties en orderregels van vóór deze datum weghalen. Geeft het aantal regels terug."""
+        with self.tx() as c:
+            n = c.execute("DELETE FROM bank_tx WHERE date < ?", (before_date,)).rowcount
+            n += c.execute("DELETE FROM orders WHERE ts < ?", (before_ts,)).rowcount
+        return n
+
+    def optimize(self) -> None:
+        with self._lock:
+            self._conn.execute("PRAGMA optimize")
 
     # Orderlogboek: elke poging om te handelen, ook mislukte, annuleringen en wijzigingen.
     def log_order(self, **row: Any) -> dict:
