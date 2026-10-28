@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, alerts, appupdate, auth, config, digest, notify, plans, portfolio, prices, rebalance, reminders, trading
+from . import __version__, alerts, appupdate, auth, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, trading
 from .sources import rabocsv
 from .store import Store
 
@@ -28,7 +28,8 @@ async def lifespan(app: FastAPI):
              asyncio.create_task(appupdate.loop(state["store"])),  # nieuwe app-versie melden
              asyncio.create_task(alerts.loop(state["store"], state["client"])),  # koersalerts
              asyncio.create_task(reminders.loop(state["store"])),  # wekelijkse herinnering Rabo-CSV
-             asyncio.create_task(digest.loop(state["store"], state["client"]))]  # weekoverzicht, mijlpalen, dividend
+             asyncio.create_task(digest.loop(state["store"], state["client"])),  # weekoverzicht, mijlpalen, dividend
+             asyncio.create_task(maintenance.loop(state["store"], state["client"]))]  # back-up, bronnen bijwerken
     yield
     for t in tasks:
         t.cancel()

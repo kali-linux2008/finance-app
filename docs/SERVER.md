@@ -291,7 +291,11 @@ cd server && docker compose up -d --build
 
 ## Back-up
 
-Alles staat in het Docker-volume `meridian-data`: de database met je versleutelde sleutels en de hoofdsleutel `master.key`. Een kopie maken:
+**Automatisch:** elke nacht na 03:00 maakt de server een kopie van de database in `data/backups/` (de laatste 14 dagen). Dat helpt bij een fout of een kapotte database, maar niet als de schijf van de server stukgaat. Kopieer daarom af en toe ook naar een USB-stick of een andere computer (zie hieronder). De `master.key` staat er niet in; die heb je nodig om de sleutels in een back-up te kunnen lezen.
+
+Ook nieuw: werkt een bron (bijv. Trezor of de Rabobank) langer dan een dag niet, dan krijg je één melding met de fout. De server werkt je bronnen elk uur bij, ook als je de app niet opent, zodat het weekoverzicht en de mijlpalen kloppen.
+
+**Met de hand:** alles staat in het Docker-volume `meridian-data`: de database met je versleutelde sleutels en de hoofdsleutel `master.key`. Een kopie maken:
 
 ```bash
 cd ~/finance-app/server

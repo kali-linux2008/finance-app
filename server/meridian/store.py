@@ -56,6 +56,15 @@ class Store:
         with self._lock:
             return self._conn.execute(sql, params).fetchall()
 
+    def backup(self, dest: str) -> None:
+        """Kopie van de hele database (ook terwijl de server draait)."""
+        target = sqlite3.connect(dest)
+        try:
+            with self._lock:
+                self._conn.backup(target)
+        finally:
+            target.close()
+
     # Geheimen per bron (versleuteld)
     def set_secret(self, source: str, data: dict[str, Any]) -> None:
         blob = self.fernet.encrypt(json.dumps(data).encode())
