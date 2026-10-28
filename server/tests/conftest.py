@@ -24,3 +24,12 @@ def clear_caches():
     portfolio._cache.clear()
     trezor._preferred = None
     yield
+
+
+@pytest.fixture(autouse=True)
+def no_retry_wait(monkeypatch):
+    from meridian import net
+
+    async def instant(_):
+        pass
+    monkeypatch.setattr(net, "_sleep", instant)

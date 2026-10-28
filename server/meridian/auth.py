@@ -38,7 +38,15 @@ def redeem_pair_code(store: Store, code: str, device: str) -> str | None:
     return token
 
 
+SEEN_EVERY = 300  # "laatst gezien" hooguit elke 5 minuten bijwerken, niet bij elk verzoek
+
+
 def check_token(store: Store, token: str) -> bool:
-    with store.tx() as c:
-        cur = c.execute("UPDATE devices SET last_seen = ? WHERE token_hash = ?", (time.time(), _h(token)))
-        return cur.rowcount == 1
+    h, now = _h(token), time.time()
+    row = store._one("SELECT last_seen FROM devices WHERE token_hash = ?", (h,))
+    if not row:
+        return False
+    if row[0] is None or now - row[0] > SEEN_EVERY:
+        with store.tx() as c:
+            c.execute("UPDATE devices SET last_seen = ? WHERE token_hash = ?", (now, h))
+    return True

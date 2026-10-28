@@ -168,11 +168,40 @@ def _save_report(store: Store, report: dict) -> dict:
     return report
 
 
+PRECHECK_HOUR = 9  # de dag vóór de inleg, vanaf 09:00
+
+
+async def precheck(store: Store, client: httpx.AsyncClient, now: datetime) -> dict | None:
+    """Een dag van tevoren kijken of er genoeg vrij saldo is; zo niet, dan een waarschuwing.
+    Zo kun je nog op tijd geld overmaken (een overboeking duurt vaak een werkdag)."""
+    plan = get_plan(store)
+    nxt = next_run(store, now)
+    if not (enabled(store) and plan["active"] and plan["lines"] and nxt):
+        return None
+    run_day = datetime.fromtimestamp(nxt, config.TZ).date()
+    if (run_day - now.date()).days != 1 or now.hour < PRECHECK_HOUR:
+        return None
+    if store.get_setting("plan.prechecked") == run_day.isoformat():
+        return None
+    store.set_setting("plan.prechecked", run_day.isoformat())
+    need = total(plan)
+    try:
+        _, cash = await trading._t212_account(client, trading.trade_secret(store, "t212"), "")
+    except Exception as e:  # noqa: BLE001
+        return notify.add(store, "Inleg morgen: saldo onbekend", f"Ik kon je vrije saldo niet bekijken: {trading._describe(e)}", "warning")
+    if cash + 0.005 >= need:
+        return None
+    return notify.add(store, "Inleg morgen: te weinig saldo",
+                      f"Morgen leg je {trading._eur(need)} in, maar er staat {trading._eur(cash)} vrij op Trading 212. "
+                      f"Maak nog {trading._eur(need - cash)} over, anders wordt er niets gekocht.", "warning")
+
+
 async def loop(store: Store, client: httpx.AsyncClient) -> None:
     """Draait zolang de server draait en kijkt elke 5 minuten of er ingelegd moet worden."""
     while True:
         try:
             now = datetime.now(config.TZ)
+            await precheck(store, client, now)
             if is_due(store, now):
                 await run(store, client, now)
         except Exception:  # noqa: BLE001

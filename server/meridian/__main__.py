@@ -37,7 +37,13 @@ HELP = """Meridian-server beheren
   python -m meridian handel periodiek      periodiek inleggen bekijken (aan / uit / maximum 400)
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
   python -m meridian melding               laatste meldingen tonen (melding test = testmelding)
-  python -m meridian apparaten             gekoppelde telefoons tonen
+  python -m meridian melding csv           wekelijkse herinnering voor de Rabo-CSV (zo 10 / uit / test)
+  python -m meridian melding soorten       koersalerts, dividend, mijlpalen, weekoverzicht aan/uit; doel <bedrag>
+  python -m meridian bank                  waar je geld heen gaat (uit je Rabo-CSV): inleg, abonnementen, uitgaven
+  python -m meridian bank tegenpartijen    hoe je tegenrekeningen zijn ingedeeld · bank regel <IBAN> <soort>
+  python -m meridian rendement             nu waard vs. ingelegd per broker (start t212 5000 = eerdere stortingen)
+  python -m meridian herbalanceren         doelverdeling en advies (doel aandelen 70 crypto 20 cash 10 goud 0 · bijkopen 375)
+  python -m meridian apparaten             gekoppelde telefoons tonen (apparaten weg 2 = één ontkoppelen)
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
 
@@ -223,7 +229,11 @@ def add_bank(s: Store, new_app: bool = False) -> None:
     s.set_secret("rabobank", secret)
     left = rabobank.days_left(secret.get("valid_until"))
     print("Opgeslagen (versleuteld)." + (f" Toestemming geldig tot over {left} dagen." if left is not None else ""))
-    print("Heb je Rabo-saldi ook bij `handmatig` ingevuld? Die telt Meridian nu niet meer mee.")
+    if not any(a.get("savings") for a in secret["accounts"]):
+        print("Je spaarrekening zit er niet bij (de Rabobank geeft die meestal niet door via PSD2).")
+        print("Vul hem in met `python -m meridian handmatig` (bank: Rabobank, Spaarrekening? j); die telt dan gewoon mee.")
+    else:
+        print("Rabo-saldi die je bij `handmatig` invulde, telt Meridian nu niet meer mee.")
     print("Verwijder het .pem-bestand van je computer als je het nergens anders nodig hebt.")
 
 
@@ -398,8 +408,14 @@ def cmd_notify(args: list[str]) -> None:
     from . import notify
 
     s = Store()
+    if args[:1] == ["csv"]:
+        cmd_csv_reminder(s, args[1:])
+        return
+    if args[:1] == ["soorten"]:
+        cmd_notify_types(s, args[1:])
+        return
     if args[:1] == ["test"]:
-        notify.add(s, "Meridian", "Testmelding: meldingen werken.")
+        notify.add(s, "Meridian", f"Testmelding ({datetime.now():%H:%M:%S}): meldingen werken.")
         print("Testmelding klaargezet. De app laat hem zien zodra hij bij de server kijkt:")
         print("meteen als je hem opent, en anders binnen ongeveer een kwartier.")
         return
@@ -408,6 +424,184 @@ def cmd_notify(args: list[str]) -> None:
         print("Nog geen meldingen.")
     for e in items:
         print(f"  {datetime.fromtimestamp(e['at']).strftime('%d-%m %H:%M')}  {e['title']}: {e['body']}")
+
+
+def cmd_notify_types(s: Store, args: list[str]) -> None:
+    """melding soorten [<soort> aan|uit] of melding soorten doel <bedrag>."""
+    from . import digest
+
+    names = {"koers": "price", "koersalerts": "price", "dividend": "div", "doel": "goal", "mijlpalen": "goal", "week": "week", "weekoverzicht": "week", "orders": "order", "order": "order"}
+    if len(args) >= 2 and args[0] == "doel" and args[1] not in ("aan", "uit"):
+        try:
+            value = parse_amount(args[1])
+        except ValueError:
+            value = 0
+        if value < 1000:
+            print("Gebruik: melding soorten doel 500000")
+            return
+        s.set_setting(digest.GOAL_KEY, value)
+        s.set_setting("goal.step", None)
+    elif len(args) >= 2 and args[0] in names and args[1] in ("aan", "uit"):
+        digest.set_types(s, {names[args[0]]: args[1] == "aan"})
+    elif args:
+        print("Gebruik: melding soorten week uit · melding soorten dividend aan · melding soorten doel 500000")
+        return
+    for k, label in digest.TYPES.items():
+        print(f"  {'✓' if digest.types(s)[k] else '·'} {label}")
+    print(f"  FIRE-doel: {eur(digest.goal(s))} (mijlpaal elke 10%) · weekoverzicht zondag 18:00")
+
+
+def cmd_csv_reminder(s: Store, args: list[str]) -> None:
+    """melding csv [aan|uit|test|<dag> <uur>]: de wekelijkse herinnering voor de Rabo-CSV."""
+    from . import notify, reminders
+
+    cur = reminders.settings(s)
+    if args[:1] in (["aan"], ["uit"]):
+        cur["on"] = args[0] == "aan"
+    elif args[:1] == ["test"]:
+        notify.add(s, "Rabo-CSV", "Testherinnering: tik hier om je CSV-bestand te kiezen.", "csv")
+        print("Testherinnering klaargezet.")
+        return
+    elif args:
+        day = args[0][:2].lower()
+        if day not in reminders.DAYS or len(args) < 2 or not args[1].isdigit() or not 0 <= int(args[1]) <= 23:
+            print("Gebruik: melding csv zo 10   (dag ma/di/wo/do/vr/za/zo en een uur 0–23)")
+            return
+        cur.update(on=True, day=reminders.DAYS.index(day), hour=int(args[1]))
+    if args:
+        s.set_setting(reminders.KEY, cur)
+    print(f"Herinnering Rabo-CSV: {reminders.describe(s)}.")
+    print("Aanpassen: melding csv zo 10 · melding csv uit · melding csv test")
+
+
+def cmd_bank(args: list[str]) -> None:
+    """bank [overzicht] · bank tegenpartijen · bank regel <IBAN-of-naam> <soort> · bank regel weg <nr>"""
+    from . import banktx
+
+    s = Store()
+    soorten = ", ".join(banktx.CATEGORIES)
+    if args[:2] == ["regel", "weg"] and len(args) == 3 and args[2].isdigit():
+        try:
+            banktx.remove_rule(s, int(args[2]) - 1)
+        except ValueError as e:
+            print("Mislukt:", e)
+            return
+        args = ["regels"]
+    elif args[:1] == ["regel"]:
+        if len(args) < 3:
+            print(f"Gebruik: bank regel <IBAN of naam> <soort>   (soort: {soorten})")
+            return
+        try:
+            banktx.add_rule(s, " ".join(args[1:-1]), args[-1])
+        except ValueError as e:
+            print("Mislukt:", e)
+            return
+        args = ["regels"]
+    if args[:1] == ["regels"]:
+        for i, r in enumerate(banktx.rules(s), 1):
+            print(f"  {i}. {r['match']:<34} → {banktx.CATEGORIES[r['cat']]}")
+        if not banktx.rules(s):
+            print("Nog geen eigen regels.")
+        return
+    if args[:1] == ["tegenpartijen"]:
+        for r in banktx.counterparties(s):
+            label = r["name"] or "?"
+            print(f"  {label[:28]:<28} {r['iban'] or '':<22} {r['count']:>3}×  {eur(r['total']):>12}  {banktx.CATEGORIES[r['cat']]}")
+        print(f"\nIets verkeerd ingedeeld? bank regel <IBAN> <soort>   (soort: {soorten})")
+        return
+    data = banktx.summary(s)
+    if not data["count"]:
+        print("Nog geen transacties. Stuur een Rabo-CSV vanuit de app (Meer → Rabo-CSV).")
+        return
+    inv = data["invested"]
+    print(f"Sinds {data['since']}: ingelegd bij Trading 212 {eur(inv['t212'])}, OKX {eur(inv['okx'])}, "
+          f"naar je abonnementenrekening {eur(inv['abo'])}\n")
+    print("Maand     Trading 212        OKX   Abonnem.  Inkomsten   Uitgaven")
+    for m in data["months"]:
+        print(f"  {m['month']}  {eur(m['t212']):>10} {eur(m['okx']):>10} {eur(m['abo']):>10} {eur(m['in']):>10} {eur(m['uit']):>10}")
+    print("\nControleren hoe alles is ingedeeld: python -m meridian bank tegenpartijen")
+
+
+def cmd_returns(args: list[str]) -> None:
+    """rendement · rendement start <t212|okx> <bedrag> (stortingen van vóór je eerste CSV)"""
+    from . import portfolio, returns
+
+    s = Store()
+    if args[:1] == ["start"]:
+        if len(args) != 3:
+            print("Gebruik: rendement start t212 5000   (wat je vóór je eerste Rabo-CSV al had gestort)")
+            return
+        try:
+            returns.set_start(s, args[1], parse_amount(args[2]))
+        except ValueError as e:
+            print("Mislukt:", e)
+            return
+
+    async def run() -> dict:
+        async with httpx.AsyncClient(timeout=20) as c:
+            return await portfolio.build(s, c)
+
+    r = returns.compute(s, asyncio.run(run())["positions"])
+    print("Broker         nu waard     ingelegd     verschil")
+    for b in r["brokers"]:
+        pct = f"  ({b['pct']:+.1f}%)".replace(".", ",") if b["pct"] is not None else ""
+        print(f"  {b['name']:<12} {eur(b['value']):>12} {eur(b['invested']):>12} {eur(b['gain']):>12}{pct}")
+    print(f"\nStortingen uit je Rabo-CSV sinds {r['since'] or '(nog geen CSV)'}, plus je startbedrag "
+          f"(t212 {eur(r['start']['t212'])}, okx {eur(r['start']['okx'])}).")
+    print("Startbedrag aanpassen: python -m meridian rendement start t212 5000")
+
+
+def cmd_rebalance(args: list[str]) -> None:
+    """herbalanceren [doel aandelen 70 crypto 20 cash 10 goud 0] [bijkopen <bedrag>]"""
+    from . import portfolio, rebalance
+
+    s = Store()
+    names = {"aandelen": "eq", "eq": "eq", "crypto": "cr", "cr": "cr", "cash": "cash", "goud": "gold", "gold": "gold"}
+    if args[:1] == ["doel"]:
+        pairs = args[1:]
+        try:
+            if len(pairs) % 2:
+                raise rebalance.RebalanceError("Geef steeds een klasse en een percentage.")
+            wanted = {}
+            for name, pct in zip(pairs[::2], pairs[1::2]):
+                if name.lower() not in names:
+                    raise rebalance.RebalanceError(f"Onbekende klasse: {name} (aandelen, crypto, cash of goud)")
+                wanted[names[name.lower()]] = pct.rstrip("%")
+            s.set_setting(rebalance.KEY, rebalance.validate(wanted))
+        except rebalance.RebalanceError as e:
+            print("Mislukt:", e)
+            return
+    targets = rebalance.get_targets(s)
+    if not targets:
+        print("Nog geen doelverdeling. Bijvoorbeeld: python -m meridian herbalanceren doel aandelen 70 crypto 20 cash 10 goud 0")
+        return
+
+    async def run() -> dict:
+        async with httpx.AsyncClient(timeout=20) as c:
+            return await portfolio.build(s, c)
+
+    data = asyncio.run(run())
+    rows = rebalance.analyse(data["positions"], targets)
+    if not sum(r["value"] for r in rows):
+        print("Nog geen saldi gevonden. Controleer je bronnen met: python -m meridian status")
+        return
+    print("Klasse              nu        doel   verschil")
+    for r in rows:
+        print(f"  {r['name']:<16} {r['pct']:>5.1f}%   {r['target']:>3}%   {eur(r['diff']):>12}")
+    amount = parse_amount(args[1]) if args[:1] == ["bijkopen"] and len(args) > 1 else None
+    if amount:
+        print(f"\nAdvies bij {eur(amount)} bijkopen:")
+        for b in rebalance.buy_only(rows, amount):
+            print(f"  {b['name']:<16} {eur(b['amount']):>12}")
+    prop = rebalance.proposals(data["positions"], rows)
+    if prop["orders"] or prop["manual"]:
+        print("\nOm in één keer op je doel te komen (uitvoeren doe je in de app):")
+        for o in prop["orders"]:
+            print(f"  {o['side']:<9} {o['tk']:<6} {eur(o['amount']):>12}  via {o['brokerName']}")
+        for m in prop["manual"]:
+            print(f"  zelf doen: {m['text']}")
+    else:
+        print("\nJe zit op je doel. Niets te doen.")
 
 
 def cmd_manual() -> None:
@@ -473,19 +667,31 @@ def cmd_status() -> None:
         print("Let op:", w)
 
 
-def cmd_devices(remove: bool = False) -> None:
+def cmd_devices(remove: bool = False, args: list[str] | None = None) -> None:
+    """apparaten · apparaten weg <nr> (één telefoon) · ontkoppel (alle telefoons)"""
     s = Store()
     if remove:
         with s.tx() as c:
             c.execute("DELETE FROM devices")
         print("Alle telefoons ontkoppeld. Koppel opnieuw met een koppelcode.")
         return
-    rows = s._all("SELECT name, created, last_seen FROM devices ORDER BY created")
+    rows = s._all("SELECT token_hash, name, created, last_seen FROM devices ORDER BY created")
+    args = args or []
+    if args[:1] == ["weg"]:
+        if len(args) != 2 or not args[1].isdigit() or not 1 <= int(args[1]) <= len(rows):
+            print("Gebruik: apparaten weg <nummer>   (het nummer zie je bij: apparaten)")
+            return
+        with s.tx() as c:
+            c.execute("DELETE FROM devices WHERE token_hash = ?", (rows[int(args[1]) - 1][0],))
+        print(f"{rows[int(args[1]) - 1][1]} ontkoppeld. Die telefoon kan niet meer bij je gegevens.")
+        return
     if not rows:
         print("Nog geen telefoon gekoppeld.")
-    for name, created, seen in rows:
+    for i, (_, name, created, seen) in enumerate(rows, 1):
         when = datetime.fromtimestamp(seen or created).strftime("%d-%m-%Y %H:%M")
-        print(f"  {name:<20} laatst gezien {when}")
+        print(f"  {i}. {name:<20} gekoppeld {datetime.fromtimestamp(created):%d-%m-%Y} · laatst gezien {when}")
+    if rows:
+        print("Eén telefoon ontkoppelen: apparaten weg <nummer>")
 
 
 def main(argv: list[str]) -> None:
@@ -504,10 +710,16 @@ def main(argv: list[str]) -> None:
         cmd_status()
     elif cmd == "melding":
         cmd_notify(args)
+    elif cmd == "rendement":
+        cmd_returns(args)
+    elif cmd == "bank":
+        cmd_bank(args)
+    elif cmd == "herbalanceren":
+        cmd_rebalance(args)
     elif cmd == "handel":
         cmd_trade(args)
     elif cmd == "apparaten":
-        cmd_devices()
+        cmd_devices(args=args)
     elif cmd == "ontkoppel":
         cmd_devices(remove=True)
     else:

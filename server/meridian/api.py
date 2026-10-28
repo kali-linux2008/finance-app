@@ -1,18 +1,19 @@
 """HTTP-API voor de app. Alles behalve /api/health en /api/koppel vraagt de apparaat-sleutel."""
 
+import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from typing import Literal
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-import asyncio
-
-from . import __version__, alerts, appupdate, auth, config, notify, plans, portfolio, prices, trading
+from . import __version__, alerts, appupdate, auth, banktx, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, returns, trading
+from .sources import rabocsv
 from .store import Store
 
 state: dict = {}
@@ -20,16 +21,26 @@ state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     config.master_key(create=True)  # eerste start: hoofdsleutel aanmaken als die er nog niet is
     state.setdefault("store", Store())
     state["client"] = httpx.AsyncClient(timeout=15, headers={"User-Agent": f"meridian/{__version__}"})
-    tasks = [asyncio.create_task(plans.loop(state["store"], state["client"])),  # periodiek inleggen
-             asyncio.create_task(appupdate.loop(state["store"])),  # nieuwe app-versie melden
-             asyncio.create_task(alerts.loop(state["store"], state["client"]))]  # koersalerts
+    s, c = state["store"], state["client"]
+    loops = {
+        "periodiek": plans.loop(s, c),  # periodiek inleggen
+        "app-update": appupdate.loop(s),  # nieuwe app-versie melden
+        "koersalerts": alerts.loop(s, c),
+        "csv-herinnering": reminders.loop(s),  # wekelijkse herinnering Rabo-CSV
+        "meldingen": digest.loop(s, c),  # weekoverzicht, mijlpalen, dividend, grote bewegingen
+        "onderhoud": maintenance.loop(s, c),  # back-up, bronnen bijwerken, storingen
+    }
+    state["tasks"] = {name: asyncio.create_task(coro, name=name) for name, coro in loops.items()}
     yield
-    for t in tasks:
+    # Netjes stoppen: taken afbreken en wachten tot ze echt klaar zijn, dan pas de verbinding dicht.
+    for t in state["tasks"].values():
         t.cancel()
-    await state["client"].aclose()
+    await asyncio.gather(*state["tasks"].values(), return_exceptions=True)
+    await c.aclose()
 
 
 app = FastAPI(title="Meridian", version=__version__, lifespan=lifespan, docs_url=None, redoc_url=None)
@@ -37,6 +48,22 @@ app = FastAPI(title="Meridian", version=__version__, lifespan=lifespan, docs_url
 # Alleen voor testen met de webversie van de app; de telefoon-app heeft dit niet nodig.
 if origins := os.environ.get("MERIDIAN_CORS_ORIGINS"):
     app.add_middleware(CORSMiddleware, allow_origins=origins.split(","), allow_methods=["GET", "POST", "PUT"], allow_headers=["Authorization", "Content-Type"])
+
+
+MAX_BODY = 6_000_000  # ruim genoeg voor een Rabo-CSV; grotere verzoeken weigeren we meteen
+
+
+@app.middleware("http")
+async def safety(request, call_next):
+    size = request.headers.get("content-length")
+    if size and size.isdigit() and int(size) > MAX_BODY:
+        return JSONResponse({"detail": "Dit verzoek is te groot."}, status_code=413)
+    response = await call_next(request)
+    # Bedragen en sleutels nooit in een cache, en geen verwijzingen naar buiten.
+    response.headers.setdefault("Cache-Control", "no-store")
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    return response
 
 
 def store() -> Store:
@@ -55,7 +82,13 @@ def device(authorization: str = Header(default=""), s: Store = Depends(store)) -
 
 @app.get("/api/health")
 def health() -> dict:
-    return {"ok": True, "name": "meridian", "version": __version__}
+    tasks = {name: not t.done() for name, t in state.get("tasks", {}).items()}
+    try:
+        state["store"]._one("SELECT 1")
+        db = True
+    except Exception:  # noqa: BLE001
+        db = False
+    return {"ok": db and all(tasks.values()), "name": "meridian", "version": __version__, "db": db, "tasks": tasks}
 
 
 class PairBody(BaseModel):
@@ -223,6 +256,36 @@ def get_events(na: int = 0, s: Store = Depends(store)) -> dict:
     return {"events": notify.events(s, na)}
 
 
+class NotifySettings(BaseModel):
+    types: dict[str, bool] = {}
+    goal: float | None = None
+
+
+def _notify_settings(s: Store) -> dict:
+    return {
+        "types": digest.types(s),
+        "labels": digest.TYPES,
+        "goal": digest.goal(s),
+        "csvReminder": reminders.describe(s),
+    }
+
+
+@app.get("/api/meldingen/instellingen", dependencies=[Depends(device)])
+def get_notify_settings(s: Store = Depends(store)) -> dict:
+    return _notify_settings(s)
+
+
+@app.put("/api/meldingen/instellingen", dependencies=[Depends(device)])
+def put_notify_settings(body: NotifySettings, s: Store = Depends(store)) -> dict:
+    digest.set_types(s, body.types)
+    if body.goal is not None:
+        if not 1000 <= body.goal <= 100_000_000:
+            raise HTTPException(400, "Kies een FIRE-doel tussen € 1.000 en € 100 miljoen.")
+        s.set_setting(digest.GOAL_KEY, round(body.goal, 2))
+        s.set_setting("goal.step", None)  # nieuw doel: mijlpalen opnieuw beginnen
+    return _notify_settings(s)
+
+
 # Koersalerts en volglijst (alleen eigen bezit en crypto via OKX).
 
 class AlertBody(BaseModel):
@@ -295,6 +358,107 @@ async def delete_watch(body: KeyBody, s: Store = Depends(store), c: httpx.AsyncC
 @app.get("/api/zoek", dependencies=[Depends(device)])
 async def search(q: str = "", s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
     return {"results": await alerts.search(s, c, q[:40])}
+
+
+# Rabobank-CSV (voor rekeningen die de bankkoppeling niet doorgeeft, zoals de spaarrekening).
+
+class CsvBody(BaseModel):
+    text: str
+
+
+def _csv_state(s: Store) -> dict:
+    st = rabocsv.state(s)
+    return {
+        "accounts": [{"iban": f"…{i[-4:]}", "balance": v["balance"], "date": v["date"]} for i, v in sorted(st["accounts"].items())],
+        "uploaded": st.get("uploaded"),
+        "reminder": reminders.describe(s),
+    }
+
+
+@app.get("/api/bank/csv", dependencies=[Depends(device)])
+def get_csv(s: Store = Depends(store)) -> dict:
+    return _csv_state(s)
+
+
+@app.post("/api/bank/csv", dependencies=[Depends(device)])
+def post_csv(body: CsvBody, s: Store = Depends(store)) -> dict:
+    if len(body.text) > rabocsv.MAX_BYTES:
+        raise HTTPException(400, "Dit bestand is te groot. Download een kortere periode (bijv. de laatste maand).")
+    try:
+        found = rabocsv.parse(body.text)
+    except rabocsv.CsvError as e:
+        raise HTTPException(400, str(e)) from e
+    rabocsv.save(s, found)
+    new_tx = s.add_bank_tx(rabocsv.transactions(body.text))
+    return {**_csv_state(s), "found": len(found), "newTransactions": new_tx}
+
+
+@app.get("/api/bank/overzicht", dependencies=[Depends(device)])
+def get_bank_summary(maanden: int = 12, s: Store = Depends(store)) -> dict:
+    return {**banktx.summary(s, max(1, min(maanden, 36))), "rules": banktx.rules(s)}
+
+
+@app.get("/api/rendement", dependencies=[Depends(device)])
+async def get_returns(s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    return returns.compute(s, (await portfolio.build(s, c))["positions"])
+
+
+class RuleBody(BaseModel):
+    match: str
+    cat: str
+
+
+@app.post("/api/bank/regels", dependencies=[Depends(device)])
+def post_bank_rule(body: RuleBody, s: Store = Depends(store)) -> dict:
+    try:
+        return {"rules": banktx.add_rule(s, body.match, body.cat)}
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+
+# Herbalanceren: doelverdeling, advies bij bijkopen en voorgestelde orders.
+
+class TargetsBody(BaseModel):
+    targets: dict[str, float]
+
+
+class RebalanceBody(BaseModel):
+    orders: list[dict]
+    requestId: str
+
+
+@app.get("/api/herbalanceren", dependencies=[Depends(device)])
+async def get_rebalance(bedrag: float | None = None, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    targets = rebalance.get_targets(s)
+    data = await portfolio.build(s, c)
+    out = {"targets": targets, "classes": rebalance.CLASSES, "current": rebalance.current(data["positions"]),
+           "rows": None, "buyOnly": None, "proposals": None}
+    if not targets:
+        return out
+    amount = bedrag if bedrag is not None else plans.total(plans.get_plan(s))
+    rows = rebalance.analyse(data["positions"], targets)
+    out.update(rows=rows, amount=amount, buyOnly=rebalance.buy_only(rows, amount),
+               proposals=rebalance.proposals(data["positions"], rows))
+    return out
+
+
+@app.put("/api/herbalanceren", dependencies=[Depends(device)])
+def put_rebalance(body: TargetsBody, s: Store = Depends(store)) -> dict:
+    try:
+        targets = rebalance.validate(body.targets)
+    except rebalance.RebalanceError as e:
+        raise HTTPException(400, str(e)) from e
+    s.set_setting(rebalance.KEY, targets)
+    return {"targets": targets}
+
+
+@app.post("/api/herbalanceren/uitvoeren", dependencies=[Depends(device)])
+async def post_rebalance(body: RebalanceBody, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    try:
+        results = await rebalance.execute(s, c, body.orders, body.requestId)
+    except rebalance.RebalanceError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"results": results, "ok": all(r["ok"] for r in results)}
 
 
 # App-updates: de nieuwste APK die op de server is gebouwd.

@@ -19,8 +19,17 @@ def events(store: Store, after: int = 0) -> list[dict]:
     return [e for e in store.get_setting("events") or [] if e["id"] > after]
 
 
+DEDUPE = 600  # dezelfde melding binnen 10 minuten niet nog eens
+
+
 def add(store: Store, title: str, body: str, kind: str = "info") -> dict:
     old = store.get_setting("events") or []
+    now = time.time()
+    for e in reversed(old):
+        if now - e["at"] > DEDUPE:
+            break
+        if e["title"] == title and e["body"] == body:
+            return e
     event = {"id": (old[-1]["id"] + 1) if old else 1, "at": time.time(), "title": title, "body": body, "kind": kind}
     store.set_setting("events", (old + [event])[-KEEP:])
     return event

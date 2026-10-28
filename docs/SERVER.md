@@ -228,6 +228,30 @@ De server kijkt elke 2 minuten, ook als je telefoon uit staat. De melding komt v
 
 Koersen komen alleen van bronnen die Meridian al gebruikt: je eigen posities (Trading 212, OKX) en de openbare koersen van OKX voor crypto. Er gaat niets extra's naar buiten. Daardoor kun je aandelen die je niet hebt (nog) niet volgen, en is er voor aandelen geen koersgrafiek. De koers van een aandeel ververst zolang de beurs open is.
 
+## 12. Echt rendement per broker
+
+```bash
+docker compose exec meridian python -m meridian rendement                  # nu waard vs. ingelegd
+docker compose exec meridian python -m meridian rendement start t212 5000  # wat je vóór je eerste CSV al stortte
+```
+
+De stortingen komen uit je Rabo-CSV (inleg Trading 212 en OKX; terugstorten telt eraf). Stortingen van vóór je eerste CSV geef je één keer op als startbedrag. BTC op je Trezor telt niet mee bij OKX.
+
+## 11. Herbalanceren
+
+Stel je doelverdeling in (stappen van 5%, samen 100%):
+
+```bash
+docker compose exec meridian python -m meridian herbalanceren doel aandelen 70 crypto 20 cash 10 goud 0
+docker compose exec meridian python -m meridian herbalanceren                 # nu vs. doel en voorgestelde orders
+docker compose exec meridian python -m meridian herbalanceren bijkopen 375    # hoe verdeel je € 375 nieuw geld
+```
+
+- **Alleen bijkopen:** nieuw geld gaat eerst naar wat achterloopt; de rest volgens je doel. Er wordt niets verkocht.
+- **Kopen & verkopen:** orders om in één keer op je doel uit te komen. Eerst verkopen, dan kopen. Aandelen via Trading 212, crypto via OKX; BTC op je Trezor wordt nooit verkocht. Cash en goud staan onder "zelf doen". Binnen 1 procentpunt van je doel gebeurt niets, en orders onder € 10 laat Meridian weg.
+
+Uitvoeren doe je straks in de app, met je vingerafdruk. Het dagmaximum voor handelen geldt ook hier.
+
 ## 10. Rabobank koppelen
 
 Je betaal- en spaarrekening, alleen-lezen. Meridian mag als privépersoon niet zelf bij de bank (daarvoor is een PSD2-vergunning nodig), dus het gaat via **Enable Banking**. Dat is gratis zolang je alleen je eigen rekeningen koppelt.
@@ -247,7 +271,40 @@ docker compose exec meridian python -m meridian bron rabobank
 
 De saldi staan daarna in de app. De bank staat hooguit 4 opvragingen per dag toe, dus de server haalt ze hooguit **elke 6 uur** op (ook als je ververst). De toestemming is 180 dagen geldig; twee weken van tevoren zie je een waarschuwing. Vernieuwen: dezelfde opdracht nog eens. Een andere applicatie gebruiken: `bron rabobank --nieuw`.
 
-Rabo-saldi die je eerder met `handmatig` invulde, telt Meridian niet meer mee zodra de koppeling er is.
+Rabo-saldi die je eerder met `handmatig` invulde, telt Meridian niet meer mee zodra de koppeling er is. Uitzondering: je **spaarrekening**. Die geeft de Rabobank meestal niet door via PSD2 (alleen betaalrekeningen); vul hem in met `handmatig` (bank: Rabobank, "Spaarrekening?" j), dan telt hij gewoon mee.
+
+### Spaarrekening via een CSV-bestand
+
+Wat de koppeling niet doorgeeft (meestal je spaarrekening), stuur je als CSV-bestand:
+
+1. Log in op rabobank.nl (Rabo Online Bankieren), kies je spaarrekening → **Download transacties** → formaat **CSV**.
+2. Open in Meridian **Meer → Rabo-CSV** en tik op **Kies CSV-bestand**.
+
+Meridian leest per rekening het saldo na de laatste transactie. Het bestand blijft op je eigen server. Elke **zondag om 10:00** krijg je een herinnering (niet als je de afgelopen 3 dagen al een bestand stuurde); tik erop en je komt meteen op het juiste scherm.
+
+```bash
+docker compose exec meridian python -m meridian melding csv          # bekijken
+docker compose exec meridian python -m meridian melding csv wo 19    # woensdag 19:00
+docker compose exec meridian python -m meridian melding csv uit      # uitzetten (aan = weer aan)
+docker compose exec meridian python -m meridian melding csv test     # testherinnering
+```
+
+Zodra er een CSV is, tellen handmatig ingevulde Rabo-saldi niet meer mee.
+
+### Waar je geld heen gaat
+
+Stuur je ook de CSV van je **betaalrekening**, dan deelt de server elke transactie in: inleg bij Trading 212, inleg bij OKX, je abonnementenrekening, eigen rekening (bijv. naar je spaarrekening), inkomsten of uitgaven. Geld dat terugkomt van een broker telt van de inleg af. Dezelfde transactie telt nooit dubbel, ook niet als je een periode twee keer stuurt.
+
+```bash
+docker compose exec meridian python -m meridian bank                  # overzicht per maand + totaal ingelegd
+docker compose exec meridian python -m meridian bank tegenpartijen    # hoe alles is ingedeeld
+docker compose exec meridian python -m meridian bank regel LT98… abo  # deze rekening = abonnementen
+docker compose exec meridian python -m meridian bank regels           # je regels (weg: bank regel weg 1)
+```
+
+Soorten: `t212`, `okx`, `abo` (abonnementen), `eigen`, `in`, `uit`. Een regel kan een IBAN zijn of een stukje van de naam of omschrijving. Trading 212 en OKX herkent de server zelf aan de naam; je **abonnementenrekening** bij Trading 212 moet je één keer aanwijzen met een regel op haar IBAN (zie `bank tegenpartijen`).
+
+Een overzicht van alle opdrachten staat in [OPDRACHTEN.md](OPDRACHTEN.md).
 
 ## Bijwerken
 
@@ -258,7 +315,11 @@ cd server && docker compose up -d --build
 
 ## Back-up
 
-Alles staat in het Docker-volume `meridian-data`: de database met je versleutelde sleutels en de hoofdsleutel `master.key`. Een kopie maken:
+**Automatisch:** elke nacht na 03:00 maakt de server een kopie van de database in `data/backups/` (de laatste 14 dagen). Dat helpt bij een fout of een kapotte database, maar niet als de schijf van de server stukgaat. Kopieer daarom af en toe ook naar een USB-stick of een andere computer (zie hieronder). De `master.key` staat er niet in; die heb je nodig om de sleutels in een back-up te kunnen lezen.
+
+Ook nieuw: werkt een bron (bijv. Trezor of de Rabobank) langer dan een dag niet, dan krijg je één melding met de fout. De server werkt je bronnen elk uur bij, ook als je de app niet opent, zodat het weekoverzicht en de mijlpalen kloppen.
+
+**Met de hand:** alles staat in het Docker-volume `meridian-data`: de database met je versleutelde sleutels en de hoofdsleutel `master.key`. Een kopie maken:
 
 ```bash
 cd ~/finance-app/server

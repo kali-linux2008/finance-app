@@ -1,13 +1,14 @@
 // Meldingen: wat de server je laat weten, zoals of je periodieke inleg gelukt is.
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { RefreshControl, View } from 'react-native';
+import { Pressable, RefreshControl, View } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
 import { FadeUp, ScreenIn } from '../components/motion';
 import { T } from '../components/T';
 import { IconButton } from '../components/ui';
+import { screenFor } from '../lib/alerts';
 import { fmtDayMonth, fmtTime } from '../lib/format';
 import { useColors } from '../state/app';
 import { useData } from '../state/data';
@@ -44,10 +45,11 @@ export function Notifications() {
               const d = new Date(e.at * 1000);
               const [icon, color, bg] = e.kind === 'ok' ? ['check', c.pos, 'rgba(107,196,143,0.14)'] as const
                 : e.kind === 'warning' ? ['close', c.neg, 'rgba(232,130,110,0.14)'] as const
+                : e.kind === 'csv' ? ['account_balance', c.gold, 'rgba(217,188,130,0.14)'] as const
                 : ['notifications', c.accent, c.accentSoft] as const;
               return (
                 <FadeUp key={e.id} index={i}>
-                  <View style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
+                  <Pressable onPress={() => router.push(screenFor(e) as never)} style={{ flexDirection: 'row', gap: 12, paddingVertical: 12, paddingHorizontal: 16 }}>
                     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: bg, alignItems: 'center', justifyContent: 'center' }}>
                       <Icon name={icon} size={18} color={color} />
                     </View>
@@ -58,7 +60,7 @@ export function Notifications() {
                       </View>
                       <T size={13} lh={1.45} color={c.muted} style={{ marginTop: 2 }}>{e.body}</T>
                     </View>
-                  </View>
+                  </Pressable>
                 </FadeUp>
               );
             })}

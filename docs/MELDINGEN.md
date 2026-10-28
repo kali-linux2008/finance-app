@@ -14,3 +14,29 @@ docker compose exec meridian python -m meridian melding test
 ```
 
 Laatste meldingen bekijken: `docker compose exec meridian python -m meridian melding`.
+
+## Soorten meldingen
+
+| Soort | Wanneer |
+|---|---|
+| Inleg | na elke periodieke inleg (altijd aan) |
+| Inleg morgen | de dag vóór de inleg vanaf 09:00, als er te weinig vrij saldo op Trading 212 staat |
+| Grote beweging | een positie gaat vandaag ±5% of meer (valt onder koersalerts; één keer per dag per positie) |
+| Koersalerts | als een koers je doel raakt (zie SERVER.md, stap 9) |
+| Dividend ontvangen | nieuw dividend op Trading 212 (de server kijkt elke 6 uur) |
+| Doel-mijlpalen | bij elke 10% van je FIRE-doel (standaard € 500.000) |
+| Weekoverzicht | zondag 18:00: hoeveel je vermogen deze week veranderde, met de beste en slechtste belegging |
+| Orders uitgevoerd | een limietorder is (helemaal) uitgevoerd bij Trading 212 of OKX |
+| Rabo-CSV | wekelijkse herinnering om een CSV-bestand te sturen (zondag 10:00) |
+| Nieuwe app-versie | als er een nieuwe app klaarstaat |
+
+Aan- of uitzetten en het doel aanpassen:
+
+```bash
+docker compose exec meridian python -m meridian melding soorten                # bekijken
+docker compose exec meridian python -m meridian melding soorten week uit       # weekoverzicht uit
+docker compose exec meridian python -m meridian melding soorten dividend aan
+docker compose exec meridian python -m meridian melding soorten doel 750000    # FIRE-doel
+```
+
+Dividend vraagt bij Trading 212 een sleutel met het leesrecht **History** (Dividends). Heeft je leessleutel dat niet, dan slaat de server dividend gewoon over. Bij de eerste keer onthoudt de server alleen welke dividenden er al waren; daarna meldt hij alleen nieuwe.

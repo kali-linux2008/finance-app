@@ -127,7 +127,7 @@ export const savePlan = (cfg: ServerConfig, plan: Plan) =>
 
 
 // Meldingen (de app haalt ze zelf op)
-export type ServerEvent = { id: number; at: number; title: string; body: string; kind: 'ok' | 'warning' | 'info' };
+export type ServerEvent = { id: number; at: number; title: string; body: string; kind: 'ok' | 'warning' | 'info' | 'csv' };
 
 export const getEvents = async (cfg: ServerConfig, after = 0) =>
   (await request<{ events: ServerEvent[] }>(`${cfg.url}/api/meldingen?na=${after}`, auth(cfg), 15000)).events;
@@ -169,3 +169,11 @@ export const removeWatch = (cfg: ServerConfig, key: string) =>
 
 export const searchInstruments = async (cfg: ServerConfig, q: string) =>
   (await request<{ results: SearchResult[] }>(`${cfg.url}/api/zoek?q=${encodeURIComponent(q)}`, auth(cfg), 20000)).results;
+
+// Rabobank-CSV: saldi uit een gedownload bestand (bijv. je spaarrekening).
+export type CsvState = { accounts: { iban: string; balance: number; date: string }[]; uploaded: number | null; reminder: string; found?: number };
+
+export const getBankCsv = (cfg: ServerConfig) => request<CsvState>(`${cfg.url}/api/bank/csv`, auth(cfg));
+
+export const uploadBankCsv = (cfg: ServerConfig, text: string) =>
+  request<CsvState>(`${cfg.url}/api/bank/csv`, post(cfg, { text }), 30000);

@@ -4,11 +4,12 @@ import time
 
 import httpx
 
-from . import config
+from . import config, net
 
 # instId → (tijdstip, laatste koers, koers bij start van de dag in UTC)
 _cache: dict[str, tuple[float, float, float]] = {}
 TTL = 60
+STALE_OK = 15 * 60  # is OKX even weg, dan mag een koers tot 15 minuten oud gebruikt worden
 
 TROY_OUNCE_G = 31.1034768
 
@@ -22,9 +23,11 @@ async def ticker(client: httpx.AsyncClient, inst: str) -> tuple[float, float] | 
     if hit and time.time() - hit[0] < TTL:
         return hit[1], hit[2]
     try:
-        r = await client.get(f"{config.OKX_URL}/api/v5/market/ticker", params={"instId": inst})
+        r = await net.request(client, "GET", f"{config.OKX_URL}/api/v5/market/ticker", params={"instId": inst})
         body = r.json()
     except (httpx.HTTPError, ValueError) as e:
+        if hit and time.time() - hit[0] < STALE_OK:
+            return hit[1], hit[2]
         raise PriceError("Koersdienst (OKX) is niet bereikbaar") from e
     if r.status_code != 200 or body.get("code") != "0" or not body.get("data"):
         return None
@@ -87,7 +90,7 @@ async def candles(client: httpx.AsyncClient, ccy: str, period: str) -> list[tupl
         if after:
             params["after"] = after
         try:
-            r = await client.get(f"{config.OKX_URL}/api/v5/market/history-candles", params=params)
+            r = await net.request(client, "GET", f"{config.OKX_URL}/api/v5/market/history-candles", params=params)
             rows = r.json().get("data") or []
         except (httpx.HTTPError, ValueError) as e:
             raise PriceError("Koersdienst (OKX) is niet bereikbaar") from e
@@ -104,7 +107,7 @@ async def ohlc(client: httpx.AsyncClient, ccy: str, bar: str = "15m", limit: int
     if not await ticker(client, inst):
         inst, factor = f"{ccy}-USDT", await _usdt_eur(client)
     try:
-        r = await client.get(f"{config.OKX_URL}/api/v5/market/candles", params={"instId": inst, "bar": bar, "limit": str(limit)})
+        r = await net.request(client, "GET", f"{config.OKX_URL}/api/v5/market/candles", params={"instId": inst, "bar": bar, "limit": str(limit)})
         rows = r.json().get("data") or []
     except (httpx.HTTPError, ValueError) as e:
         raise PriceError("Koersdienst (OKX) is niet bereikbaar") from e
