@@ -15,7 +15,7 @@ import uuid
 
 import httpx
 
-from . import config, notify, portfolio, prices
+from . import config, digest, notify, portfolio, prices
 from .store import Store
 
 log = logging.getLogger("meridian.alerts")
@@ -143,7 +143,7 @@ def remove_alert(store: Store, alert_id: str) -> bool:
 async def check(store: Store, client: httpx.AsyncClient) -> list[dict]:
     """Kijkt alle alerts na en meldt de geraakte. Geeft de afgegane alerts terug."""
     alerts = get_alerts(store)
-    if not alerts:
+    if not alerts or not digest.enabled(store, "price"):  # koersalerts uitgezet: niets melden
         return []
     q = await quotes(store, client, {a["key"] for a in alerts})
     fired: list[tuple[dict, float]] = []

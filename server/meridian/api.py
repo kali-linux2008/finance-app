@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, alerts, appupdate, auth, config, notify, plans, portfolio, prices, reminders, trading
+from . import __version__, alerts, appupdate, auth, config, digest, notify, plans, portfolio, prices, reminders, trading
 from .sources import rabocsv
 from .store import Store
 
@@ -27,7 +27,8 @@ async def lifespan(app: FastAPI):
     tasks = [asyncio.create_task(plans.loop(state["store"], state["client"])),  # periodiek inleggen
              asyncio.create_task(appupdate.loop(state["store"])),  # nieuwe app-versie melden
              asyncio.create_task(alerts.loop(state["store"], state["client"])),  # koersalerts
-             asyncio.create_task(reminders.loop(state["store"]))]  # wekelijkse herinnering Rabo-CSV
+             asyncio.create_task(reminders.loop(state["store"])),  # wekelijkse herinnering Rabo-CSV
+             asyncio.create_task(digest.loop(state["store"], state["client"]))]  # weekoverzicht, mijlpalen, dividend
     yield
     for t in tasks:
         t.cancel()
@@ -223,6 +224,36 @@ async def put_plan(body: PlanBody, s: Store = Depends(store), c: httpx.AsyncClie
 @app.get("/api/meldingen", dependencies=[Depends(device)])
 def get_events(na: int = 0, s: Store = Depends(store)) -> dict:
     return {"events": notify.events(s, na)}
+
+
+class NotifySettings(BaseModel):
+    types: dict[str, bool] = {}
+    goal: float | None = None
+
+
+def _notify_settings(s: Store) -> dict:
+    return {
+        "types": digest.types(s),
+        "labels": digest.TYPES,
+        "goal": digest.goal(s),
+        "csvReminder": reminders.describe(s),
+    }
+
+
+@app.get("/api/meldingen/instellingen", dependencies=[Depends(device)])
+def get_notify_settings(s: Store = Depends(store)) -> dict:
+    return _notify_settings(s)
+
+
+@app.put("/api/meldingen/instellingen", dependencies=[Depends(device)])
+def put_notify_settings(body: NotifySettings, s: Store = Depends(store)) -> dict:
+    digest.set_types(s, body.types)
+    if body.goal is not None:
+        if not 1000 <= body.goal <= 100_000_000:
+            raise HTTPException(400, "Kies een FIRE-doel tussen € 1.000 en € 100 miljoen.")
+        s.set_setting(digest.GOAL_KEY, round(body.goal, 2))
+        s.set_setting("goal.step", None)  # nieuw doel: mijlpalen opnieuw beginnen
+    return _notify_settings(s)
 
 
 # Koersalerts en volglijst (alleen eigen bezit en crypto via OKX).

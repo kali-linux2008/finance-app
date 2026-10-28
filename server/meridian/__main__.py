@@ -38,6 +38,7 @@ HELP = """Meridian-server beheren
   (handelssleutel van je echte account: bron trading212-handel --echt / bron okx-handel --echt)
   python -m meridian melding               laatste meldingen tonen (melding test = testmelding)
   python -m meridian melding csv           wekelijkse herinnering voor de Rabo-CSV (zo 10 / uit / test)
+  python -m meridian melding soorten       koersalerts, dividend, mijlpalen, weekoverzicht aan/uit; doel <bedrag>
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -406,6 +407,9 @@ def cmd_notify(args: list[str]) -> None:
     if args[:1] == ["csv"]:
         cmd_csv_reminder(s, args[1:])
         return
+    if args[:1] == ["soorten"]:
+        cmd_notify_types(s, args[1:])
+        return
     if args[:1] == ["test"]:
         notify.add(s, "Meridian", "Testmelding: meldingen werken.")
         print("Testmelding klaargezet. De app laat hem zien zodra hij bij de server kijkt:")
@@ -416,6 +420,31 @@ def cmd_notify(args: list[str]) -> None:
         print("Nog geen meldingen.")
     for e in items:
         print(f"  {datetime.fromtimestamp(e['at']).strftime('%d-%m %H:%M')}  {e['title']}: {e['body']}")
+
+
+def cmd_notify_types(s: Store, args: list[str]) -> None:
+    """melding soorten [<soort> aan|uit] of melding soorten doel <bedrag>."""
+    from . import digest
+
+    names = {"koers": "price", "koersalerts": "price", "dividend": "div", "doel": "goal", "mijlpalen": "goal", "week": "week", "weekoverzicht": "week"}
+    if len(args) >= 2 and args[0] == "doel" and args[1] not in ("aan", "uit"):
+        try:
+            value = parse_amount(args[1])
+        except ValueError:
+            value = 0
+        if value < 1000:
+            print("Gebruik: melding soorten doel 500000")
+            return
+        s.set_setting(digest.GOAL_KEY, value)
+        s.set_setting("goal.step", None)
+    elif len(args) >= 2 and args[0] in names and args[1] in ("aan", "uit"):
+        digest.set_types(s, {names[args[0]]: args[1] == "aan"})
+    elif args:
+        print("Gebruik: melding soorten week uit · melding soorten dividend aan · melding soorten doel 500000")
+        return
+    for k, label in digest.TYPES.items():
+        print(f"  {'✓' if digest.types(s)[k] else '·'} {label}")
+    print(f"  FIRE-doel: {eur(digest.goal(s))} (mijlpaal elke 10%) · weekoverzicht zondag 18:00")
 
 
 def cmd_csv_reminder(s: Store, args: list[str]) -> None:
