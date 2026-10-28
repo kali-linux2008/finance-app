@@ -39,6 +39,7 @@ HELP = """Meridian-server beheren
   python -m meridian melding               laatste meldingen tonen (melding test = testmelding)
   python -m meridian melding csv           wekelijkse herinnering voor de Rabo-CSV (zo 10 / uit / test)
   python -m meridian melding soorten       koersalerts, dividend, mijlpalen, weekoverzicht aan/uit; doel <bedrag>
+  python -m meridian herbalanceren         doelverdeling en advies (doel aandelen 70 crypto 20 cash 10 goud 0 · bijkopen 375)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
 """
@@ -470,6 +471,59 @@ def cmd_csv_reminder(s: Store, args: list[str]) -> None:
     print("Aanpassen: melding csv zo 10 · melding csv uit · melding csv test")
 
 
+def cmd_rebalance(args: list[str]) -> None:
+    """herbalanceren [doel aandelen 70 crypto 20 cash 10 goud 0] [bijkopen <bedrag>]"""
+    from . import portfolio, rebalance
+
+    s = Store()
+    names = {"aandelen": "eq", "eq": "eq", "crypto": "cr", "cr": "cr", "cash": "cash", "goud": "gold", "gold": "gold"}
+    if args[:1] == ["doel"]:
+        pairs = args[1:]
+        try:
+            if len(pairs) % 2:
+                raise rebalance.RebalanceError("Geef steeds een klasse en een percentage.")
+            wanted = {}
+            for name, pct in zip(pairs[::2], pairs[1::2]):
+                if name.lower() not in names:
+                    raise rebalance.RebalanceError(f"Onbekende klasse: {name} (aandelen, crypto, cash of goud)")
+                wanted[names[name.lower()]] = pct.rstrip("%")
+            s.set_setting(rebalance.KEY, rebalance.validate(wanted))
+        except rebalance.RebalanceError as e:
+            print("Mislukt:", e)
+            return
+    targets = rebalance.get_targets(s)
+    if not targets:
+        print("Nog geen doelverdeling. Bijvoorbeeld: python -m meridian herbalanceren doel aandelen 70 crypto 20 cash 10 goud 0")
+        return
+
+    async def run() -> dict:
+        async with httpx.AsyncClient(timeout=20) as c:
+            return await portfolio.build(s, c)
+
+    data = asyncio.run(run())
+    rows = rebalance.analyse(data["positions"], targets)
+    if not sum(r["value"] for r in rows):
+        print("Nog geen saldi gevonden. Controleer je bronnen met: python -m meridian status")
+        return
+    print("Klasse              nu        doel   verschil")
+    for r in rows:
+        print(f"  {r['name']:<16} {r['pct']:>5.1f}%   {r['target']:>3}%   {eur(r['diff']):>12}")
+    amount = parse_amount(args[1]) if args[:1] == ["bijkopen"] and len(args) > 1 else None
+    if amount:
+        print(f"\nAdvies bij {eur(amount)} bijkopen:")
+        for b in rebalance.buy_only(rows, amount):
+            print(f"  {b['name']:<16} {eur(b['amount']):>12}")
+    prop = rebalance.proposals(data["positions"], rows)
+    if prop["orders"] or prop["manual"]:
+        print("\nOm in één keer op je doel te komen (uitvoeren doe je in de app):")
+        for o in prop["orders"]:
+            print(f"  {o['side']:<9} {o['tk']:<6} {eur(o['amount']):>12}  via {o['brokerName']}")
+        for m in prop["manual"]:
+            print(f"  zelf doen: {m['text']}")
+    else:
+        print("\nJe zit op je doel. Niets te doen.")
+
+
 def cmd_manual() -> None:
     s = Store()
     data = s.get_setting("manual") or {}
@@ -564,6 +618,8 @@ def main(argv: list[str]) -> None:
         cmd_status()
     elif cmd == "melding":
         cmd_notify(args)
+    elif cmd == "herbalanceren":
+        cmd_rebalance(args)
     elif cmd == "handel":
         cmd_trade(args)
     elif cmd == "apparaten":

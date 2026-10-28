@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, alerts, appupdate, auth, config, digest, notify, plans, portfolio, prices, reminders, trading
+from . import __version__, alerts, appupdate, auth, config, digest, notify, plans, portfolio, prices, rebalance, reminders, trading
 from .sources import rabocsv
 from .store import Store
 
@@ -360,6 +360,51 @@ def post_csv(body: CsvBody, s: Store = Depends(store)) -> dict:
         raise HTTPException(400, str(e)) from e
     rabocsv.save(s, found)
     return {**_csv_state(s), "found": len(found)}
+
+
+# Herbalanceren: doelverdeling, advies bij bijkopen en voorgestelde orders.
+
+class TargetsBody(BaseModel):
+    targets: dict[str, float]
+
+
+class RebalanceBody(BaseModel):
+    orders: list[dict]
+    requestId: str
+
+
+@app.get("/api/herbalanceren", dependencies=[Depends(device)])
+async def get_rebalance(bedrag: float | None = None, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    targets = rebalance.get_targets(s)
+    data = await portfolio.build(s, c)
+    out = {"targets": targets, "classes": rebalance.CLASSES, "current": rebalance.current(data["positions"]),
+           "rows": None, "buyOnly": None, "proposals": None}
+    if not targets:
+        return out
+    amount = bedrag if bedrag is not None else plans.total(plans.get_plan(s))
+    rows = rebalance.analyse(data["positions"], targets)
+    out.update(rows=rows, amount=amount, buyOnly=rebalance.buy_only(rows, amount),
+               proposals=rebalance.proposals(data["positions"], rows))
+    return out
+
+
+@app.put("/api/herbalanceren", dependencies=[Depends(device)])
+def put_rebalance(body: TargetsBody, s: Store = Depends(store)) -> dict:
+    try:
+        targets = rebalance.validate(body.targets)
+    except rebalance.RebalanceError as e:
+        raise HTTPException(400, str(e)) from e
+    s.set_setting(rebalance.KEY, targets)
+    return {"targets": targets}
+
+
+@app.post("/api/herbalanceren/uitvoeren", dependencies=[Depends(device)])
+async def post_rebalance(body: RebalanceBody, s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    try:
+        results = await rebalance.execute(s, c, body.orders, body.requestId)
+    except rebalance.RebalanceError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"results": results, "ok": all(r["ok"] for r in results)}
 
 
 # App-updates: de nieuwste APK die op de server is gebouwd.

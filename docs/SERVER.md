@@ -228,6 +228,21 @@ De server kijkt elke 2 minuten, ook als je telefoon uit staat. De melding komt v
 
 Koersen komen alleen van bronnen die Meridian al gebruikt: je eigen posities (Trading 212, OKX) en de openbare koersen van OKX voor crypto. Er gaat niets extra's naar buiten. Daardoor kun je aandelen die je niet hebt (nog) niet volgen, en is er voor aandelen geen koersgrafiek. De koers van een aandeel ververst zolang de beurs open is.
 
+## 11. Herbalanceren
+
+Stel je doelverdeling in (stappen van 5%, samen 100%):
+
+```bash
+docker compose exec meridian python -m meridian herbalanceren doel aandelen 70 crypto 20 cash 10 goud 0
+docker compose exec meridian python -m meridian herbalanceren                 # nu vs. doel en voorgestelde orders
+docker compose exec meridian python -m meridian herbalanceren bijkopen 375    # hoe verdeel je € 375 nieuw geld
+```
+
+- **Alleen bijkopen:** nieuw geld gaat eerst naar wat achterloopt; de rest volgens je doel. Er wordt niets verkocht.
+- **Kopen & verkopen:** orders om in één keer op je doel uit te komen. Eerst verkopen, dan kopen. Aandelen via Trading 212, crypto via OKX; BTC op je Trezor wordt nooit verkocht. Cash en goud staan onder "zelf doen". Binnen 1 procentpunt van je doel gebeurt niets, en orders onder € 10 laat Meridian weg.
+
+Uitvoeren doe je straks in de app, met je vingerafdruk. Het dagmaximum voor handelen geldt ook hier.
+
 ## 10. Rabobank koppelen
 
 Je betaal- en spaarrekening, alleen-lezen. Meridian mag als privépersoon niet zelf bij de bank (daarvoor is een PSD2-vergunning nodig), dus het gaat via **Enable Banking**. Dat is gratis zolang je alleen je eigen rekeningen koppelt.
