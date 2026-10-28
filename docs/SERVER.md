@@ -228,6 +228,15 @@ De server kijkt elke 2 minuten, ook als je telefoon uit staat. De melding komt v
 
 Koersen komen alleen van bronnen die Meridian al gebruikt: je eigen posities (Trading 212, OKX) en de openbare koersen van OKX voor crypto. Er gaat niets extra's naar buiten. Daardoor kun je aandelen die je niet hebt (nog) niet volgen, en is er voor aandelen geen koersgrafiek. De koers van een aandeel ververst zolang de beurs open is.
 
+## 12. Echt rendement per broker
+
+```bash
+docker compose exec meridian python -m meridian rendement                  # nu waard vs. ingelegd
+docker compose exec meridian python -m meridian rendement start t212 5000  # wat je vóór je eerste CSV al stortte
+```
+
+De stortingen komen uit je Rabo-CSV (inleg Trading 212 en OKX; terugstorten telt eraf). Stortingen van vóór je eerste CSV geef je één keer op als startbedrag. BTC op je Trezor telt niet mee bij OKX.
+
 ## 11. Herbalanceren
 
 Stel je doelverdeling in (stappen van 5%, samen 100%):

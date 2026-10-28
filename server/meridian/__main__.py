@@ -41,6 +41,7 @@ HELP = """Meridian-server beheren
   python -m meridian melding soorten       koersalerts, dividend, mijlpalen, weekoverzicht aan/uit; doel <bedrag>
   python -m meridian bank                  waar je geld heen gaat (uit je Rabo-CSV): inleg, abonnementen, uitgaven
   python -m meridian bank tegenpartijen    hoe je tegenrekeningen zijn ingedeeld · bank regel <IBAN> <soort>
+  python -m meridian rendement             nu waard vs. ingelegd per broker (start t212 5000 = eerdere stortingen)
   python -m meridian herbalanceren         doelverdeling en advies (doel aandelen 70 crypto 20 cash 10 goud 0 · bijkopen 375)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
@@ -521,6 +522,35 @@ def cmd_bank(args: list[str]) -> None:
     print("\nControleren hoe alles is ingedeeld: python -m meridian bank tegenpartijen")
 
 
+def cmd_returns(args: list[str]) -> None:
+    """rendement · rendement start <t212|okx> <bedrag> (stortingen van vóór je eerste CSV)"""
+    from . import portfolio, returns
+
+    s = Store()
+    if args[:1] == ["start"]:
+        if len(args) != 3:
+            print("Gebruik: rendement start t212 5000   (wat je vóór je eerste Rabo-CSV al had gestort)")
+            return
+        try:
+            returns.set_start(s, args[1], parse_amount(args[2]))
+        except ValueError as e:
+            print("Mislukt:", e)
+            return
+
+    async def run() -> dict:
+        async with httpx.AsyncClient(timeout=20) as c:
+            return await portfolio.build(s, c)
+
+    r = returns.compute(s, asyncio.run(run())["positions"])
+    print("Broker         nu waard     ingelegd     verschil")
+    for b in r["brokers"]:
+        pct = f"  ({b['pct']:+.1f}%)".replace(".", ",") if b["pct"] is not None else ""
+        print(f"  {b['name']:<12} {eur(b['value']):>12} {eur(b['invested']):>12} {eur(b['gain']):>12}{pct}")
+    print(f"\nStortingen uit je Rabo-CSV sinds {r['since'] or '(nog geen CSV)'}, plus je startbedrag "
+          f"(t212 {eur(r['start']['t212'])}, okx {eur(r['start']['okx'])}).")
+    print("Startbedrag aanpassen: python -m meridian rendement start t212 5000")
+
+
 def cmd_rebalance(args: list[str]) -> None:
     """herbalanceren [doel aandelen 70 crypto 20 cash 10 goud 0] [bijkopen <bedrag>]"""
     from . import portfolio, rebalance
@@ -668,6 +698,8 @@ def main(argv: list[str]) -> None:
         cmd_status()
     elif cmd == "melding":
         cmd_notify(args)
+    elif cmd == "rendement":
+        cmd_returns(args)
     elif cmd == "bank":
         cmd_bank(args)
     elif cmd == "herbalanceren":

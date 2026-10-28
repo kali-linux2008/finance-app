@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 
 import httpx
 
-from . import config, notify
+from . import config, notify, portfolio
 from .sources import trading212
 from .store import Store
 
@@ -110,6 +110,34 @@ def milestone(store: Store, now: datetime) -> dict | None:
     return notify.add(store, title, body, "ok")
 
 
+# Grote dagbeweging van een positie (ontwerp: "bij ±5% beweging van een positie")
+
+MOVE_KEY = "notify.move"
+DEFAULT_MOVE = 5.0
+
+
+def moves(store: Store, positions: list[dict], now: datetime) -> list[dict]:
+    """Eén melding per positie per dag als die vandaag meer dan ±5% beweegt (valt onder koersalerts)."""
+    if not enabled(store, "price"):
+        return []
+    limit = float(store.get_setting(MOVE_KEY, DEFAULT_MOVE))
+    today = now.date().isoformat()
+    sent_today = store.get_setting("move.sent") or {}
+    if sent_today.get("date") != today:
+        sent_today = {"date": today, "ids": []}
+    out = []
+    for p in positions:
+        chg = p.get("dayChange")
+        if chg is None or abs(chg) < limit or p["id"] in sent_today["ids"] or p.get("cat") not in ("eq", "cr"):
+            continue
+        sent_today["ids"].append(p["id"])
+        word = "stijgt" if chg > 0 else "daalt"
+        body = f"{p['name']} {word} {_pct(chg)[1:]} vandaag. Waarde nu {_eur(float(p.get('value') or 0))}."
+        out.append(notify.add(store, f"{p['tk']} {_pct(chg)} vandaag", body, "info"))
+    store.set_setting("move.sent", sent_today)
+    return out
+
+
 # Dividend (Trading 212)
 
 def _tk(ticker: str) -> str:
@@ -151,12 +179,14 @@ async def dividends(store: Store, client: httpx.AsyncClient, now: float | None =
 
 
 async def loop(store: Store, client: httpx.AsyncClient) -> None:
+    await asyncio.sleep(90)  # eerst rustig opstarten
     while True:
         try:
             now = datetime.now(config.TZ)
             weekly(store, now)
             milestone(store, now)
             await dividends(store, client)
+            moves(store, (await portfolio.build(store, client))["positions"], now)
         except Exception:  # noqa: BLE001
             log.exception("Meldingen: onverwachte fout")
         await asyncio.sleep(CHECK_EVERY)

@@ -20,6 +20,8 @@ Laatste meldingen bekijken: `docker compose exec meridian python -m meridian mel
 | Soort | Wanneer |
 |---|---|
 | Inleg | na elke periodieke inleg (altijd aan) |
+| Inleg morgen | de dag vóór de inleg vanaf 09:00, als er te weinig vrij saldo op Trading 212 staat |
+| Grote beweging | een positie gaat vandaag ±5% of meer (valt onder koersalerts; één keer per dag per positie) |
 | Koersalerts | als een koers je doel raakt (zie SERVER.md, stap 9) |
 | Dividend ontvangen | nieuw dividend op Trading 212 (de server kijkt elke 6 uur) |
 | Doel-mijlpalen | bij elke 10% van je FIRE-doel (standaard € 500.000) |

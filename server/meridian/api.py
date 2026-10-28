@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, alerts, appupdate, auth, banktx, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, trading
+from . import __version__, alerts, appupdate, auth, banktx, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, returns, trading
 from .sources import rabocsv
 from .store import Store
 
@@ -367,6 +367,11 @@ def post_csv(body: CsvBody, s: Store = Depends(store)) -> dict:
 @app.get("/api/bank/overzicht", dependencies=[Depends(device)])
 def get_bank_summary(maanden: int = 12, s: Store = Depends(store)) -> dict:
     return {**banktx.summary(s, max(1, min(maanden, 36))), "rules": banktx.rules(s)}
+
+
+@app.get("/api/rendement", dependencies=[Depends(device)])
+async def get_returns(s: Store = Depends(store), c: httpx.AsyncClient = Depends(client)) -> dict:
+    return returns.compute(s, (await portfolio.build(s, c))["positions"])
 
 
 class RuleBody(BaseModel):
