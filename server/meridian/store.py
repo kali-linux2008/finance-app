@@ -22,7 +22,13 @@ CREATE TABLE IF NOT EXISTS orders (
   action TEXT NOT NULL, symbol TEXT NOT NULL, kind TEXT, amount REAL, qty REAL, price REAL,
   ok INTEGER NOT NULL, broker_id TEXT, message TEXT
 );
+CREATE TABLE IF NOT EXISTS bank_tx (
+  iban TEXT NOT NULL, seq INTEGER NOT NULL, date TEXT NOT NULL, amount REAL NOT NULL,
+  counter_iban TEXT, counter_name TEXT, descr TEXT, PRIMARY KEY (iban, seq)
+);
 """
+
+BANK_TX_FIELDS = ("iban", "seq", "date", "amount", "counter_iban", "counter_name", "descr")
 
 ORDER_FIELDS = ("id", "ts", "request_id", "broker", "demo", "action", "symbol", "kind", "amount", "qty", "price",
                 "ok", "broker_id", "message")
@@ -117,6 +123,19 @@ class Store:
                      SELECT MAX(ts) FROM snapshots WHERE ts < ? GROUP BY CAST(ts / 86400 AS INTEGER))""",
                 (cutoff, cutoff),
             )
+
+    # Banktransacties uit de Rabo-CSV (alleen op je eigen server).
+    def add_bank_tx(self, rows: list[dict]) -> int:
+        """Voegt transacties toe; dezelfde (rekening, volgnummer) nooit dubbel. Geeft het aantal nieuwe terug."""
+        with self.tx() as c:
+            before = c.total_changes
+            c.executemany(f"INSERT OR IGNORE INTO bank_tx ({', '.join(BANK_TX_FIELDS)}) VALUES ({', '.join('?' * len(BANK_TX_FIELDS))})",
+                          [[r.get(k) for k in BANK_TX_FIELDS] for r in rows])
+            return c.total_changes - before
+
+    def bank_tx(self, since: str = "0000-00-00") -> list[dict]:
+        rows = self._all(f"SELECT {', '.join(BANK_TX_FIELDS)} FROM bank_tx WHERE date >= ? ORDER BY date, iban, seq", (since,))
+        return [dict(zip(BANK_TX_FIELDS, r)) for r in rows]
 
     # Orderlogboek: elke poging om te handelen, ook mislukte, annuleringen en wijzigingen.
     def log_order(self, **row: Any) -> dict:

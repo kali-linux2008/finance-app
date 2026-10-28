@@ -65,6 +65,26 @@ def parse(text: str) -> dict[str, dict]:
     return {iban: {"balance": round(b, 2), "date": d.isoformat(), "cur": cur} for iban, (d, _, b, cur) in latest.items()}
 
 
+def transactions(text: str) -> list[dict]:
+    """Alle transacties uit het bestand (zonder omschrijvingen langer dan nodig)."""
+    reader = csv.DictReader(io.StringIO(text.lstrip("\ufeff")), delimiter=",", quotechar='"')
+    out = []
+    for r in reader:
+        try:
+            out.append({
+                "iban": (r.get("IBAN/BBAN") or "").strip().replace(" ", ""),
+                "seq": int((r.get("Volgnr") or "0").strip() or 0),
+                "date": date.fromisoformat((r.get("Datum") or "").strip()).isoformat(),
+                "amount": round(amount(r.get("Bedrag") or ""), 2),
+                "counter_iban": (r.get("Tegenrekening IBAN/BBAN") or "").strip().replace(" ", "") or None,
+                "counter_name": (r.get("Naam tegenpartij") or "").strip()[:70] or None,
+                "descr": " ".join((r.get(f"Omschrijving-{i}") or "").strip() for i in (1, 2, 3)).strip()[:120] or None,
+            })
+        except ValueError:
+            continue
+    return [t for t in out if t["iban"] and t["seq"]]
+
+
 def save(store: Store, parsed: dict[str, dict], now: float | None = None) -> dict:
     """Voegt toe aan wat er al was; een ouder bestand overschrijft geen nieuwer saldo."""
     now = now or time.time()

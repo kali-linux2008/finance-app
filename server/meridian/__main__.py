@@ -39,6 +39,8 @@ HELP = """Meridian-server beheren
   python -m meridian melding               laatste meldingen tonen (melding test = testmelding)
   python -m meridian melding csv           wekelijkse herinnering voor de Rabo-CSV (zo 10 / uit / test)
   python -m meridian melding soorten       koersalerts, dividend, mijlpalen, weekoverzicht aan/uit; doel <bedrag>
+  python -m meridian bank                  waar je geld heen gaat (uit je Rabo-CSV): inleg, abonnementen, uitgaven
+  python -m meridian bank tegenpartijen    hoe je tegenrekeningen zijn ingedeeld · bank regel <IBAN> <soort>
   python -m meridian herbalanceren         doelverdeling en advies (doel aandelen 70 crypto 20 cash 10 goud 0 · bijkopen 375)
   python -m meridian apparaten             gekoppelde telefoons tonen
   python -m meridian ontkoppel             alle telefoons ontkoppelen
@@ -471,6 +473,54 @@ def cmd_csv_reminder(s: Store, args: list[str]) -> None:
     print("Aanpassen: melding csv zo 10 · melding csv uit · melding csv test")
 
 
+def cmd_bank(args: list[str]) -> None:
+    """bank [overzicht] · bank tegenpartijen · bank regel <IBAN-of-naam> <soort> · bank regel weg <nr>"""
+    from . import banktx
+
+    s = Store()
+    soorten = ", ".join(banktx.CATEGORIES)
+    if args[:2] == ["regel", "weg"] and len(args) == 3 and args[2].isdigit():
+        try:
+            banktx.remove_rule(s, int(args[2]) - 1)
+        except ValueError as e:
+            print("Mislukt:", e)
+            return
+        args = ["regels"]
+    elif args[:1] == ["regel"]:
+        if len(args) < 3:
+            print(f"Gebruik: bank regel <IBAN of naam> <soort>   (soort: {soorten})")
+            return
+        try:
+            banktx.add_rule(s, " ".join(args[1:-1]), args[-1])
+        except ValueError as e:
+            print("Mislukt:", e)
+            return
+        args = ["regels"]
+    if args[:1] == ["regels"]:
+        for i, r in enumerate(banktx.rules(s), 1):
+            print(f"  {i}. {r['match']:<34} → {banktx.CATEGORIES[r['cat']]}")
+        if not banktx.rules(s):
+            print("Nog geen eigen regels.")
+        return
+    if args[:1] == ["tegenpartijen"]:
+        for r in banktx.counterparties(s):
+            label = r["name"] or "?"
+            print(f"  {label[:28]:<28} {r['iban'] or '':<22} {r['count']:>3}×  {eur(r['total']):>12}  {banktx.CATEGORIES[r['cat']]}")
+        print(f"\nIets verkeerd ingedeeld? bank regel <IBAN> <soort>   (soort: {soorten})")
+        return
+    data = banktx.summary(s)
+    if not data["count"]:
+        print("Nog geen transacties. Stuur een Rabo-CSV vanuit de app (Meer → Rabo-CSV).")
+        return
+    inv = data["invested"]
+    print(f"Sinds {data['since']}: ingelegd bij Trading 212 {eur(inv['t212'])}, OKX {eur(inv['okx'])}, "
+          f"naar je abonnementenrekening {eur(inv['abo'])}\n")
+    print("Maand     Trading 212        OKX   Abonnem.  Inkomsten   Uitgaven")
+    for m in data["months"]:
+        print(f"  {m['month']}  {eur(m['t212']):>10} {eur(m['okx']):>10} {eur(m['abo']):>10} {eur(m['in']):>10} {eur(m['uit']):>10}")
+    print("\nControleren hoe alles is ingedeeld: python -m meridian bank tegenpartijen")
+
+
 def cmd_rebalance(args: list[str]) -> None:
     """herbalanceren [doel aandelen 70 crypto 20 cash 10 goud 0] [bijkopen <bedrag>]"""
     from . import portfolio, rebalance
@@ -618,6 +668,8 @@ def main(argv: list[str]) -> None:
         cmd_status()
     elif cmd == "melding":
         cmd_notify(args)
+    elif cmd == "bank":
+        cmd_bank(args)
     elif cmd == "herbalanceren":
         cmd_rebalance(args)
     elif cmd == "handel":

@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 import asyncio
 
-from . import __version__, alerts, appupdate, auth, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, trading
+from . import __version__, alerts, appupdate, auth, banktx, config, digest, maintenance, notify, plans, portfolio, prices, rebalance, reminders, trading
 from .sources import rabocsv
 from .store import Store
 
@@ -360,7 +360,26 @@ def post_csv(body: CsvBody, s: Store = Depends(store)) -> dict:
     except rabocsv.CsvError as e:
         raise HTTPException(400, str(e)) from e
     rabocsv.save(s, found)
-    return {**_csv_state(s), "found": len(found)}
+    new_tx = s.add_bank_tx(rabocsv.transactions(body.text))
+    return {**_csv_state(s), "found": len(found), "newTransactions": new_tx}
+
+
+@app.get("/api/bank/overzicht", dependencies=[Depends(device)])
+def get_bank_summary(maanden: int = 12, s: Store = Depends(store)) -> dict:
+    return {**banktx.summary(s, max(1, min(maanden, 36))), "rules": banktx.rules(s)}
+
+
+class RuleBody(BaseModel):
+    match: str
+    cat: str
+
+
+@app.post("/api/bank/regels", dependencies=[Depends(device)])
+def post_bank_rule(body: RuleBody, s: Store = Depends(store)) -> dict:
+    try:
+        return {"rules": banktx.add_rule(s, body.match, body.cat)}
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 # Herbalanceren: doelverdeling, advies bij bijkopen en voorgestelde orders.

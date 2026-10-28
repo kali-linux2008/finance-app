@@ -282,6 +282,19 @@ docker compose exec meridian python -m meridian melding csv test     # testherin
 
 Zodra er een CSV is, tellen handmatig ingevulde Rabo-saldi niet meer mee.
 
+### Waar je geld heen gaat
+
+Stuur je ook de CSV van je **betaalrekening**, dan deelt de server elke transactie in: inleg bij Trading 212, inleg bij OKX, je abonnementenrekening, eigen rekening (bijv. naar je spaarrekening), inkomsten of uitgaven. Geld dat terugkomt van een broker telt van de inleg af. Dezelfde transactie telt nooit dubbel, ook niet als je een periode twee keer stuurt.
+
+```bash
+docker compose exec meridian python -m meridian bank                  # overzicht per maand + totaal ingelegd
+docker compose exec meridian python -m meridian bank tegenpartijen    # hoe alles is ingedeeld
+docker compose exec meridian python -m meridian bank regel LT98… abo  # deze rekening = abonnementen
+docker compose exec meridian python -m meridian bank regels           # je regels (weg: bank regel weg 1)
+```
+
+Soorten: `t212`, `okx`, `abo` (abonnementen), `eigen`, `in`, `uit`. Een regel kan een IBAN zijn of een stukje van de naam of omschrijving. Trading 212 en OKX herkent de server zelf aan de naam; je **abonnementenrekening** bij Trading 212 moet je één keer aanwijzen met een regel op haar IBAN (zie `bank tegenpartijen`).
+
 ## Bijwerken
 
 ```bash
