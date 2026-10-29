@@ -102,19 +102,35 @@ def state(store: Store) -> dict:
     return store.get_setting(KEY) or {"accounts": {}, "uploaded": None}
 
 
+def kinds(store: Store, today: date | None = None) -> dict[str, str]:
+    """Per rekening "Spaarrekening" of "Betaalrekening".
+
+    De CSV zegt niet wat voor rekening het is. Een spaarrekening heeft (bijna) alleen
+    overboekingen van en naar je eigen rekeningen; een betaalrekening ook winkels, salaris enz.
+    """
+    own = set(state(store)["accounts"])
+    counts: dict[str, list[int]] = {}
+    for t in store.bank_tx(date.fromordinal((today or date.today()).toordinal() - 365).isoformat()):
+        c = counts.setdefault(t["iban"], [0, 0])
+        c[0] += 1
+        c[1] += (t.get("counter_iban") or "") in own
+    return {i: "Spaarrekening" if n and mine / n >= 0.8 else "Betaalrekening" for i, (n, mine) in counts.items()}
+
+
 def source(store: Store, skip_ibans: set[str], today: date | None = None) -> SourceResult | None:
-    """Rekeningen uit de CSV die niet al via de bankkoppeling binnenkomen."""
-    accounts = {i: v for i, v in state(store)["accounts"].items() if i not in skip_ibans}
+    """Rekeningen uit de CSV die niet al via de bankkoppeling binnenkomen (lege rekeningen niet)."""
+    accounts = {i: v for i, v in state(store)["accounts"].items() if i not in skip_ibans and v["balance"]}
     if not accounts:
         return None
     today = today or date.today()
     res = SourceResult(id=KEY, name="Rabobank (CSV)", sub="uit je CSV-bestand")
+    kind = kinds(store, today)
     for iban, v in sorted(accounts.items()):
         if v.get("cur", "EUR") != "EUR":
             continue
         d = date.fromisoformat(v["date"])
         res.positions.append(Position(
-            id=f"rabocsv-{iban[-6:]}", tk="RABO", name=f"Spaarrekening ·{iban[-4:]}", cls="Cash", cat="cash",
+            id=f"rabocsv-{iban[-6:]}", tk="RABO", name=f"{kind.get(iban, 'Spaarrekening')} ·{iban[-4:]}", cls="Cash", cat="cash",
             src="Rabobank", value=v["balance"], tile=3,
             note=f"Saldo uit je CSV-bestand, laatste transactie op {d.day}-{d.month}-{d.year}.",
         ))

@@ -5,7 +5,7 @@ import getpass
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
 import httpx
 from . import auth, config
@@ -41,6 +41,7 @@ HELP = """Meridian-server beheren
   python -m meridian melding soorten       koersalerts, dividend, mijlpalen, weekoverzicht aan/uit; doel <bedrag>
   python -m meridian bank                  waar je geld heen gaat (uit je Rabo-CSV): inleg, abonnementen, uitgaven
   python -m meridian bank tegenpartijen    hoe je tegenrekeningen zijn ingedeeld · bank regel <IBAN> <soort>
+  python -m meridian bank wis tot 2024-12-31   oude banktransacties weghalen (saldi blijven staan)
   python -m meridian rendement             nu waard vs. ingelegd per broker (start t212 5000 = eerdere stortingen)
   python -m meridian herbalanceren         doelverdeling en advies (doel aandelen 70 crypto 20 cash 10 goud 0 · bijkopen 375)
   python -m meridian apparaten             gekoppelde telefoons tonen (apparaten weg 2 = één ontkoppelen)
@@ -475,10 +476,24 @@ def cmd_csv_reminder(s: Store, args: list[str]) -> None:
 
 
 def cmd_bank(args: list[str]) -> None:
-    """bank [overzicht] · bank tegenpartijen · bank regel <IBAN-of-naam> <soort> · bank regel weg <nr>"""
+    """bank [overzicht] · bank tegenpartijen · bank regel <IBAN-of-naam> <soort> · bank regel weg <nr>
+    · bank wis tot <jjjj-mm-dd>"""
     from . import banktx
 
     s = Store()
+    if args[:2] == ["wis", "tot"]:
+        try:
+            until = date.fromisoformat(args[2]).isoformat() if len(args) == 3 else ""
+        except ValueError:
+            until = ""
+        if not until:
+            print("Gebruik: bank wis tot 2024-12-31   (haalt alle transacties tot en met die dag weg)")
+            return
+        if input(f"Alle banktransacties tot en met {until} weghalen? Typ ja: ").strip().lower() != "ja":
+            print("Niets weggehaald.")
+            return
+        print(f"{s.delete_bank_tx_until(until)} transacties weggehaald. Je saldi blijven staan.")
+        return
     soorten = ", ".join(banktx.CATEGORIES)
     if args[:2] == ["regel", "weg"] and len(args) == 3 and args[2].isdigit():
         try:

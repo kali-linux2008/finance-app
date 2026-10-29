@@ -145,6 +145,11 @@ class Store:
         rows = self._all(f"SELECT {', '.join(BANK_TX_FIELDS)} FROM bank_tx WHERE date >= ? ORDER BY date, iban, seq", (since,))
         return [dict(zip(BANK_TX_FIELDS, r)) for r in rows]
 
+    def delete_bank_tx_until(self, last_date: str) -> int:
+        """Banktransacties tot en met deze datum weghalen. Geeft het aantal terug."""
+        with self.tx() as c:
+            return c.execute("DELETE FROM bank_tx WHERE date <= ?", (last_date,)).rowcount
+
     # Koers per positie per dag (voor de beste en slechtste van de week).
     def add_pos_snaps(self, day: str, rows: list[tuple[str, str, float]]) -> None:
         with self.tx() as c:

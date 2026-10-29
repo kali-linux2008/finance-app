@@ -48,6 +48,22 @@ async def test_portfolio_uses_csv_but_not_twice(store):
     assert rabocsv.source(store, set(), today=date(2027, 1, 1)).warnings
 
 
+def test_account_kind_and_empty_accounts(store):
+    rabocsv.save(store, rabocsv.parse(CSV))
+    store.add_bank_tx(rabocsv.transactions(CSV))
+    assert rabocsv.kinds(store, date(2026, 10, 28)) == {"NL01RABO0300000001": "Spaarrekening", "NL02RABO0100000002": "Betaalrekening"}
+    names = [x.name for x in rabocsv.source(store, set(), today=date(2026, 10, 28)).positions]
+    assert names == ["Spaarrekening ·0001", "Betaalrekening ·0002"]
+    rabocsv.save(store, {"NL03RABO0100000003": {"balance": 0.0, "date": "2026-10-25", "cur": "EUR"}})  # opgeheven rekening
+    assert len(rabocsv.source(store, set(), today=date(2026, 10, 28)).positions) == 2
+
+
+def test_delete_old_transactions(store):
+    store.add_bank_tx(rabocsv.transactions(CSV))
+    assert store.delete_bank_tx_until("2026-10-20") == 1
+    assert {t["date"] for t in store.bank_tx()} == {"2026-10-25"}
+
+
 def test_weekly_reminder(store):
     sunday = datetime(2026, 11, 1, 10, 5, tzinfo=config.TZ)
     assert not reminders.due(store, sunday.replace(hour=9))
