@@ -74,7 +74,7 @@ def test_weekly_reminder(store):
     assert not reminders.due(store, datetime(2026, 11, 8, 10, 5, tzinfo=config.TZ))  # net gestuurd: overslaan
     assert reminders.due(store, datetime(2026, 11, 15, 10, 5, tzinfo=config.TZ))
     store.set_setting(reminders.KEY, {"on": True, "day": 2, "hour": 19})
-    assert reminders.describe(store) == "elke wo om 19:00"
+    assert reminders.describe(store) == "elke woensdag om 19:00"
     store.set_setting(reminders.KEY, {"on": False})
     assert reminders.describe(store) == "uit" and not reminders.due(store, datetime(2026, 11, 22, 10, 5, tzinfo=config.TZ))
 
@@ -90,5 +90,5 @@ def test_api_csv(store, monkeypatch):
         assert r.status_code == 400 and "Rabobank" in r.json()["detail"]
         r = c.post("/api/bank/csv", headers=h, json={"text": CSV}).json()
         assert r["found"] == 2 and r["accounts"][0] == {"iban": "…0001", "balance": 12650.5, "date": "2026-10-25"}
-        assert r["reminder"] == "elke zo om 10:00" and r["uploaded"]
+        assert r["reminder"] == "elke zondag om 10:00" and r["uploaded"]
     assert not [e for e in notify.events(store) if e["kind"] == "csv"]

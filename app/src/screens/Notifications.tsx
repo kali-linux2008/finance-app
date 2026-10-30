@@ -33,7 +33,8 @@ export function Notifications() {
     <ScreenIn style={{ backgroundColor: c.bg, paddingTop: insets.top }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 4, height: 56 }}>
         <IconButton name="arrow_back" size={24} onPress={() => router.back()} />
-        <T size={16} w={700} style={{ marginLeft: 4 }}>Meldingen</T>
+        <T size={16} w={700} style={{ flex: 1, marginLeft: 4 }}>Meldingen</T>
+        <IconButton name="tune" label="Meldingen instellen" onPress={() => router.push('/meldingen-instellen')} />
       </View>
       <ScrollView
         contentContainerStyle={{ paddingBottom: 24 + insets.bottom }}

@@ -259,6 +259,7 @@ def get_events(na: int = 0, s: Store = Depends(store)) -> dict:
 class NotifySettings(BaseModel):
     types: dict[str, bool] = {}
     goal: float | None = None
+    move: float | None = None
 
 
 def _notify_settings(s: Store) -> dict:
@@ -266,6 +267,7 @@ def _notify_settings(s: Store) -> dict:
         "types": digest.types(s),
         "labels": digest.TYPES,
         "goal": digest.goal(s),
+        "move": float(s.get_setting(digest.MOVE_KEY, digest.DEFAULT_MOVE)),
         "csvReminder": reminders.describe(s),
     }
 
@@ -283,6 +285,10 @@ def put_notify_settings(body: NotifySettings, s: Store = Depends(store)) -> dict
             raise HTTPException(400, "Kies een FIRE-doel tussen € 1.000 en € 100 miljoen.")
         s.set_setting(digest.GOAL_KEY, round(body.goal, 2))
         s.set_setting("goal.step", None)  # nieuw doel: mijlpalen opnieuw beginnen
+    if body.move is not None:
+        if not 1 <= body.move <= 50:
+            raise HTTPException(400, "Kies een beweging tussen 1% en 50%.")
+        s.set_setting(digest.MOVE_KEY, round(body.move, 1))
     return _notify_settings(s)
 
 

@@ -90,3 +90,6 @@ def test_api_settings(store, monkeypatch):
         r = c.put("/api/meldingen/instellingen", headers=h, json={"types": {"week": False, "onzin": False}, "goal": 750000}).json()
         assert r["types"]["week"] is False and "onzin" not in r["types"] and r["goal"] == 750000
         assert c.put("/api/meldingen/instellingen", headers=h, json={"goal": 5}).status_code == 400
+        assert r["move"] == 5.0
+        assert c.put("/api/meldingen/instellingen", headers=h, json={"move": 8}).json()["move"] == 8.0
+        assert c.put("/api/meldingen/instellingen", headers=h, json={"move": 0}).status_code == 400

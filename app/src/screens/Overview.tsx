@@ -49,7 +49,7 @@ export function Overview() {
         </View>
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <IconButton name={privacy ? 'visibility_off' : 'visibility'} onPress={togglePrivacy} />
-          <IconButton name="search" onPress={soon} />
+          <IconButton name="search" label="Zoeken" onPress={() => router.push('/zoeken')} />
           <IconButton onPress={() => router.push('/meldingen')} label="Meldingen">
             <Icon name="notifications" />
             {!live || unseen ? (

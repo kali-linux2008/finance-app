@@ -29,12 +29,10 @@ export function Portfolio() {
   const devs = rebalanceDeviations(positions, total);
   const orders = { icon: 'pending_actions' as IconName, label: 'Orders', sub: live ? 'Bekijken' : `${OPEN_ORDERS} open`, dot: false, go: () => router.push('/orders') };
   const periodic = { icon: 'autorenew' as IconName, label: 'Periodiek', sub: live ? 'Inlegplan' : `${money(monthlyInvesting())} p/m`, dot: false, go: () => router.push('/periodiek') };
-  // Herbalanceren komt later; met echte data tonen we Orders en Periodiek.
-  const links: { icon: IconName; label: string; sub: string; dot: boolean; go: () => void }[] = live ? [orders, periodic] : [
-    orders,
-    periodic,
-    { icon: 'balance', label: 'Balans', sub: devs ? `${devs} ${devs === 1 ? 'afwijking' : 'afwijkingen'}` : 'in balans', dot: devs > 0, go: soon },
-  ];
+  const balance = live
+    ? { icon: 'balance' as IconName, label: 'Balans', sub: 'Doel vs. nu', dot: false, go: () => router.push('/herbalanceren') }
+    : { icon: 'balance' as IconName, label: 'Balans', sub: devs ? `${devs} ${devs === 1 ? 'afwijking' : 'afwijkingen'}` : 'in balans', dot: devs > 0, go: () => router.push('/herbalanceren') };
+  const links: { icon: IconName; label: string; sub: string; dot: boolean; go: () => void }[] = [orders, periodic, balance];
   const watch = [...WATCHLIST].sort((a, b) => b.change - a.change);
   let rowIndex = 0;
 
