@@ -1,5 +1,6 @@
 // Praten met je eigen Meridian-server. Elk verzoek heeft een tijdslimiet en een begrijpelijke foutmelding.
-import type { Outside, Position, Source } from '../data/sample';
+import type { Category, Outside, Position, Source } from '../data/sample';
+import type { ServerManual, ServerOrder } from './rebalance';
 import type { Period } from './series';
 import type { Candle, OrderType, Quote, Side } from './trade';
 
@@ -177,3 +178,35 @@ export const getBankCsv = (cfg: ServerConfig) => request<CsvState>(`${cfg.url}/a
 
 export const uploadBankCsv = (cfg: ServerConfig, text: string) =>
   request<CsvState>(`${cfg.url}/api/bank/csv`, post(cfg, { text }), 30000);
+
+// Herbalanceren: doel per klasse, en wat je moet doen om daar te komen.
+export type RebalanceState = {
+  targets: Record<Category, number> | null;
+  current: Record<Category, number>;
+  amount?: number;
+  buyOnly: { cls: Category; name: string; amount: number }[] | null;
+  proposals: { orders: ServerOrder[]; manual: ServerManual[] } | null;
+};
+export type RebalanceResult = ServerOrder & { ok: boolean; message: string | null };
+
+export const getRebalance = (cfg: ServerConfig) => request<RebalanceState>(`${cfg.url}/api/herbalanceren`, auth(cfg), 30000);
+
+export const saveTargets = (cfg: ServerConfig, targets: Record<Category, number>) =>
+  request<{ targets: Record<Category, number> }>(`${cfg.url}/api/herbalanceren`, { ...post(cfg, { targets }), method: 'PUT' });
+
+export const executeRebalance = (cfg: ServerConfig, orders: ServerOrder[], requestId: string) =>
+  request<{ results: RebalanceResult[]; ok: boolean }>(`${cfg.url}/api/herbalanceren/uitvoeren`, post(cfg, { orders, requestId }), 120000);
+
+// Meldingen-instellingen: welke soorten aan staan en je FIRE-doel.
+export type NotifySettings = {
+  types: Record<string, boolean>;
+  labels: Record<string, string>;
+  goal: number;
+  move: number;
+  csvReminder: string;
+};
+
+export const getNotifySettings = (cfg: ServerConfig) => request<NotifySettings>(`${cfg.url}/api/meldingen/instellingen`, auth(cfg));
+
+export const saveNotifySettings = (cfg: ServerConfig, s: { types?: Record<string, boolean>; goal?: number; move?: number }) =>
+  request<NotifySettings>(`${cfg.url}/api/meldingen/instellingen`, { ...post(cfg, s), method: 'PUT' });

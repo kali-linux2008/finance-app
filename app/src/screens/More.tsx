@@ -21,7 +21,7 @@ const ROWS: [IconName, string, string, string?][] = [
   ['pending_actions', 'Lopende orders', `${OPEN_ORDERS} open`, '/orders'],
   ['autorenew', 'Periodiek inleggen', 'Plannen, pauzeren, historie', '/periodiek'],
   ['star', 'Volglijst', 'Koersen volgen en koersalerts', '/volglijst'],
-  ['balance', 'Herbalanceren', 'Doel vs. nu'],
+  ['balance', 'Herbalanceren', 'Doel vs. nu', '/herbalanceren'],
   ['calendar_month', 'Dividendkalender', 'Ex- en uitbetaaldata'],
   ['summarize', 'Rapporten', 'Maand- en jaaroverzicht'],
   ['insights', 'Inzichten & allocatie', 'Regio, valuta, kosten, Box 3'],
@@ -29,6 +29,7 @@ const ROWS: [IconName, string, string, string?][] = [
   ['link', 'Bronnen', '5 gekoppeld'],
   ['account_balance', 'Rabo-CSV', 'Spaarrekening bijwerken met een CSV-bestand', '/bank'],
   ['notifications', 'Meldingen', 'Alle meldingen van je server', '/meldingen'],
+  ['tune', 'Meldingen instellen', 'Welke meldingen je krijgt', '/meldingen-instellen'],
 ];
 
 export function More() {

@@ -10,7 +10,8 @@ const NAMES = [
   'currency_exchange', 'payments', 'edit', 'chevron_right', 'calendar_month', 'summarize',
   'insights=search_insights', 'link', 'candlestick_chart', 'account_balance', 'edit_note', 'construction',
   'fingerprint', 'backspace', 'sync', 'check', 'remove', 'expand_more=keyboard_arrow_down', 'close', 'science',
-  'system_update=mobile_arrow_down', 'delete', 'star',
+  'system_update=mobile_arrow_down', 'delete', 'star', 'restart_alt', 'sell', 'savings', 'verified', 'error',
+  'arrow_forward', 'sync_alt', 'tune', 'check_box', 'check_box_outline_blank',
 ];
 
 const pkg = process.argv[2];

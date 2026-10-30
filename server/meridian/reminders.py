@@ -17,6 +17,7 @@ log = logging.getLogger("meridian.reminders")
 KEY = "csv.reminder"
 DEFAULT = {"on": True, "day": 6, "hour": 10}  # 0 = maandag … 6 = zondag
 DAYS = ["ma", "di", "wo", "do", "vr", "za", "zo"]
+DAY_NAMES = ["maandag", "dinsdag", "woensdag", "donderdag", "vrijdag", "zaterdag", "zondag"]
 SKIP_IF_UPLOADED = 3 * 86400
 CHECK_EVERY = 600
 
@@ -39,7 +40,7 @@ def due(store: Store, now: datetime) -> bool:
 
 def describe(store: Store) -> str:
     s = settings(store)
-    return f"elke {DAYS[s['day']]} om {s['hour']}:00" if s["on"] else "uit"
+    return f"elke {DAY_NAMES[s['day']]} om {s['hour']}:00" if s["on"] else "uit"
 
 
 async def loop(store: Store) -> None:
